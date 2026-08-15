@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Products - Mini Daraz{% endblock %}
+{% block content %}
+<section class="py-4">
+    <div class="container">
+        <div class="row">
+            <!-- Filters -->
+            <div class="col-lg-3 mb-4">
+                <div class="filter-box">
+                    <h5>Filters</h5>
+                    <form method="get" action="{{ url_for('products') }}">
+                        <input type="hidden" name="q" value="{{ request.args.get('q','') }}">
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <select name="category" class="form-select">
+                                <option value="">All</option>
+                                {% for c in categories %}<option value="{{ c['id'] }}" {% if c['id']|string == request.args.get('category','') %}selected{% endif %}>{{ c['name'] }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Brand</label>
+                            <input type="text" name="brand" class="form-control" value="{{ request.args.get('brand','') }}" placeholder="Brand">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Max Price (Rs.)</label>
+                            <input type="number" name="max_price" class="form-control" value="{{ request.args.get('max_price','') }}" placeholder="e.g. 5000">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Min Rating</label>
+                            <select name="rating" class="form-select">
+                                <option value="">Any</option>
+                                <option value="4" {% if request.args.get('rating')=='4' %}selected{% endif %}>&#9733; 4+</option>
+                                <option value="3" {% if request.args.get('rating')=='3' %}selected{% endif %}>&#9733; 3+</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" name="discount" value="1" id="fdisc" {% if request.args.get('discount') %}checked{% endif %}>
+                            <label class="form-check-label" for="fdisc">On Discount</label>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" name="in_stock" value="1" id="fstock" {% if request.args.get('in_stock') %}checked{% endif %}>
+                            <label class="form-check-label" for="fstock">In Stock</label>
+                        </div>
+                        <button class="btn btn-primary w-100">Apply</button>
+                        <a href="{{ url_for('products') }}" class="btn btn-link w-100">Clear</a>
+                    </form>
+                </div>
+            </div>
+            <!-- Products -->
+            <div class="col-lg-9">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>{{ products|length }} Products</h4>
+                    <select class="form-select w-auto" onchange="location.href=this.value">
+                        <option value="{{ sort_urls.default }}">Sort: Default</option>
+                        <option value="{{ sort_urls.price_asc }}">Price: Low to High</option>
+                        <option value="{{ sort_urls.price_desc }}">Price: High to Low</option>
+                        <option value="{{ sort_urls.rating }}">Top Rated</option>
+                        <option value="{{ sort_urls.newest }}">Newest</option>
+                    </select>
+                </div>
+                <div class="row">
+                    {% for p in products %}
+                    <div class="col-6 col-md-4 col-lg-3 mb-4">
+                        <div class="product-card">
+                            <a href="{{ url_for('product_details', product_id=p['id']) }}">
+                                <div class="product-img">
+                                    <img src="{{ url_for('static', filename='images/products/' ~ (p['image'] or 'default-product.svg')) }}" alt="{{ p['name'] }}" loading="lazy">
+                                    {% if p['discount'] and p['discount'] > 0 %}<span class="discount-badge">-{{ p['discount'] }}%</span>{% endif %}
+                                </div>
+                            </a>
+                            <div class="product-body">
+                                <a href="{{ url_for('product_details', product_id=p['id']) }}" class="product-name">{{ p['name'] }}</a>
+                                <div class="product-brand">{{ p['brand'] or '' }}</div>
+                                <div class="product-price">
+                                    {% set dp = p['price'] - (p['price'] * p['discount'] / 100) if p['discount'] else p['price'] %}
+                                    <span class="current">Rs. {{ "%.0f"|format(dp) }}</span>
+                                    {% if p['discount'] and p['discount'] > 0 %}<span class="old">Rs. {{ "%.0f"|format(p['price']) }}</span>{% endif %}
+                                </div>
+                                <div class="product-actions">
+                                    <button class="btn btn-add-cart" data-product="{{ p['id'] }}"><i class="fas fa-cart-plus"></i> Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-12"><div class="alert alert-info">No products found.</div></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

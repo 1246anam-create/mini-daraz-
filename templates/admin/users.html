@@ -1,0 +1,26 @@
+{% extends "admin/base.html" %}
+{% block title %}Users - Admin{% endblock %}
+{% block content %}
+<h2 class="mb-3">Users</h2>
+<div class="card"><div class="card-body table-responsive">
+    <table class="table table-sm align-middle">
+        <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u['id'] }}</td>
+            <td>{{ u['full_name'] }}</td>
+            <td>{{ u['email'] }}</td>
+            <td>{{ u['phone'] or '' }}</td>
+            <td><span class="badge bg-{{ 'success' if u['status']=='active' else 'secondary' }}">{{ u['status'] }}</span></td>
+            <td>{{ u['created_at'] }}</td>
+            <td>
+                <a href="{{ url_for('admin_toggle_user', user_id=u['id']) }}" class="btn btn-sm btn-{{ 'warning' if u['status']=='active' else 'success' }}">{% if u['status']=='active' %}Deactivate{% else %}Activate{% endif %}</a>
+                <a href="{{ url_for('admin_delete_user', user_id=u['id']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete user?')"><i class="fas fa-trash"></i></a>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div></div>
+{% endblock %}

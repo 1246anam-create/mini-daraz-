@@ -1,0 +1,38 @@
+{% extends "admin/base.html" %}
+{% block title %}Categories - Admin{% endblock %}
+{% block content %}
+<h2 class="mb-3">Categories</h2>
+<div class="row">
+    <div class="col-lg-5">
+        <div class="card"><div class="card-body">
+            <form method="post" action="{{ url_for('admin_categories') }}">
+                <div class="mb-3"><label class="form-label">Name</label><input name="name" class="form-control" required></div>
+                <div class="mb-3"><label class="form-label">Description</label><textarea name="description" class="form-control"></textarea></div>
+                <button class="btn btn-primary">Add Category</button>
+            </form>
+        </div></div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card"><div class="card-body table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Name</th><th>Description</th><th>Actions</th></tr></thead>
+                <tbody>
+                {% for c in categories %}
+                <tr>
+                    <td>{{ c['name'] }}</td>
+                    <td>{{ c['description'] or '' }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('admin_edit_category', category_id=c['id']) }}" class="d-inline">
+                            <input name="name" value="{{ c['name'] }}" class="form-control form-control-sm d-inline" style="width:120px">
+                            <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
+                        </form>
+                        <a href="{{ url_for('admin_delete_category', category_id=c['id']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="fas fa-trash"></i></a>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+</div>
+{% endblock %}

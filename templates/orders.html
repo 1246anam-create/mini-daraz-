@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}My Orders - Mini Daraz{% endblock %}
+{% block content %}
+<section class="py-4">
+    <div class="container">
+        <h2 class="mb-4">My Orders</h2>
+        {% if orders %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>Order #</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                {% for o in orders %}
+                    <tr>
+                        <td>{{ o['order_number'] }}</td>
+                        <td>{{ o['created_at'] }}</td>
+                        <td>Rs. {{ "%.0f"|format(o['total']) }}</td>
+                        <td><span class="badge bg-info">{{ o['status'] }}</span></td>
+                        <td><a href="{{ url_for('order_details', order_id=o['id']) }}" class="btn btn-sm btn-primary">View</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">No orders yet. <a href="{{ url_for('products') }}">Start shopping</a></div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

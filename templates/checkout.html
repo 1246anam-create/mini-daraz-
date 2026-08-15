@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Checkout - Mini Daraz{% endblock %}
+{% block content %}
+<section class="py-4">
+    <div class="container">
+        <h2 class="mb-4">Checkout</h2>
+        {% if not items %}
+        <div class="alert alert-warning">Your cart is empty. <a href="{{ url_for('products') }}">Shop now</a></div>
+        {% else %}
+        <form method="post" action="{{ url_for('checkout') }}">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-3"><div class="card-body">
+                        <h5>Shipping Details</h5>
+                        <div class="mb-3"><label class="form-label">Full Name</label><input name="customer_name" class="form-control" required value="{{ user['full_name'] or '' }}"></div>
+                        <div class="mb-3"><label class="form-label">Phone</label><input name="phone" class="form-control" required value="{{ user['phone'] or '' }}"></div>
+                        <div class="mb-3"><label class="form-label">Email</label><input name="email" type="email" class="form-control" required value="{{ user['email'] or '' }}"></div>
+                        <div class="mb-3"><label class="form-label">Address</label><textarea name="address" class="form-control" required>{{ user['address'] or '' }}</textarea></div>
+                        <div class="row">
+                            <div class="col-6 mb-3"><label class="form-label">City</label><input name="city" class="form-control" required value="{{ user['city'] or '' }}"></div>
+                            <div class="col-6 mb-3"><label class="form-label">Postal Code</label><input name="postal_code" class="form-control" value="{{ user['postal_code'] or '' }}"></div>
+                        </div>
+                    </div></div>
+                    <div class="card"><div class="card-body">
+                        <h5>Payment Method</h5>
+                        <div class="form-check"><input class="form-check-input" type="radio" name="payment_method" value="cod" id="cod" checked><label class="form-check-label" for="cod">Cash on Delivery</label></div>
+                    </div></div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="summary-box">
+                        <h5>Order Summary</h5>
+                        {% for it in items %}
+                        <div class="d-flex justify-content-between"><span>{{ it['name'] }} x{{ it['quantity'] }}</span><span>Rs. {{ "%.0f"|format((it['price'] - (it['price']*it['discount']/100) if it['discount'] else it['price']) * it['quantity']) }}</span></div>
+                        {% endfor %}
+                        <hr>
+                        <div class="d-flex justify-content-between"><span>Subtotal</span><span>Rs. {{ "%.0f"|format(subtotal) }}</span></div>
+                        <div class="d-flex justify-content-between"><span>Delivery</span><span>{% if delivery == 0 %}FREE{% else %}Rs. {{ "%.0f"|format(delivery) }}{% endif %}</span></div>
+                        {% if discount > 0 %}<div class="d-flex justify-content-between text-success"><span>Discount</span><span>- Rs. {{ "%.0f"|format(discount) }}</span></div>{% endif %}
+                        <hr>
+                        <div class="d-flex justify-content-between fw-bold"><span>Total</span><span>Rs. {{ "%.0f"|format(total) }}</span></div>
+                        <button class="btn btn-primary w-100 mt-3">Place Order</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

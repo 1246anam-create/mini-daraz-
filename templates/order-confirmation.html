@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Order Confirmed - Mini Daraz{% endblock %}
+{% block content %}
+<section class="py-5">
+    <div class="container text-center">
+        <div class="success-icon"><i class="fas fa-check-circle"></i></div>
+        <h2>Thank You! Your order is placed.</h2>
+        <p class="lead">Order Number: <strong>{{ order['order_number'] }}</strong></p>
+        <p>Total: Rs. {{ "%.0f"|format(order['total']) }} | Payment: {{ order['payment_method'] }}</p>
+        <div class="tracking-steps my-4 d-flex justify-content-center flex-wrap gap-3">
+            {% set steps = ['Pending','Confirmed','Processing','Shipped','Delivered'] %}
+            {% for s in steps %}<div class="step {% if loop.index0 <= steps.index(order['status']) %}active{% endif %}"><div class="step-dot">{{ loop.index }}</div><span>{{ s }}</span></div>{% endfor %}
+        </div>
+        <div class="mt-3">
+            <a href="{{ url_for('order_details', order_id=order['id']) }}" class="btn btn-primary">View Order</a>
+            <a href="{{ url_for('products') }}" class="btn btn-outline-primary">Continue Shopping</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

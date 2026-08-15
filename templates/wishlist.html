@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Wishlist - Mini Daraz{% endblock %}
+{% block content %}
+<section class="py-4">
+    <div class="container">
+        <h2 class="mb-4">My Wishlist</h2>
+        {% if items %}
+        <div class="row">
+            {% for it in items %}
+            <div class="col-6 col-md-4 col-lg-3 mb-4">
+                <div class="product-card">
+                    <a href="{{ url_for('product_details', product_id=it['id']) }}">
+                        <div class="product-img"><img src="{{ url_for('static', filename='images/products/' ~ (it['image'] or 'default-product.svg')) }}" alt="{{ it['name'] }}"></div>
+                    </a>
+                    <div class="product-body">
+                        <a href="{{ url_for('product_details', product_id=it['id']) }}" class="product-name">{{ it['name'] }}</a>
+                        <div class="product-price"><span class="current">Rs. {{ "%.0f"|format(it['price'] - (it['price']*it['discount']/100) if it['discount'] else it['price']) }}</span></div>
+                        <div class="product-actions">
+                            <button class="btn btn-add-cart" data-product="{{ it['id'] }}"><i class="fas fa-cart-plus"></i> Move to Cart</button>
+                            <button class="btn btn-danger btn-sm remove-wish" data-id="{{ it['wish_id'] }}"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">Your wishlist is empty. <a href="{{ url_for('products') }}">Browse products</a></div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
