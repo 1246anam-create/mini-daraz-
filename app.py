@@ -1584,6 +1584,27 @@ FREE_DELIVERY_ABOVE = 1000.0
 # never run the __main__ block, so init_db must be called at module load).
 init_db()
 
+# ---------------------------------------------------------------------------
+# Ensure a working admin account exists on every startup.
+# Fixes "Invalid admin credentials" on fresh/deployed databases without
+# needing to run seed.py manually.
+# ---------------------------------------------------------------------------
+def _ensure_admin():
+    from werkzeug.security import generate_password_hash
+    admin = query("SELECT id FROM admins WHERE email = ?", ("admin@minidaraz.com",), one=True)
+    if not admin:
+        execute(
+            "INSERT INTO admins (full_name, email, password) VALUES (?, ?, ?)",
+            ("Store Admin", "admin@minidaraz.com", generate_password_hash("admin123")),
+        )
+    else:
+        execute(
+            "UPDATE admins SET password = ? WHERE email = ?",
+            (generate_password_hash("admin123"), "admin@minidaraz.com"),
+        )
+
+_ensure_admin()
+
 
 # =========================
 # RUN (local development)
