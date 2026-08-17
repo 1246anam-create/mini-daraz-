@@ -1583,3 +1583,10 @@ FREE_DELIVERY_ABOVE = 1000.0
 # Ensure database tables exist on import (WSGI servers like PythonAnywhere
 # never run the __main__ block, so init_db must be called at module load).
 init_db()
+
+
+# =========================
+# RUN (local development)
+# =========================
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
