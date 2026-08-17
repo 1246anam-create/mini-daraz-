@@ -38,6 +38,61 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // ---- Cart page: quantity stepper + remove ----
+    document.querySelectorAll('.qty-minus').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = this.getAttribute('data-id');
+            const input = document.querySelector('.cart-qty[data-id="' + id + '"]');
+            if (!input) return;
+            let v = parseInt(input.value) - 1;
+            if (v < 1) v = 1;
+            input.value = v;
+            updateCartItem(id, v);
+        });
+    });
+
+    document.querySelectorAll('.qty-plus').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = this.getAttribute('data-id');
+            const input = document.querySelector('.cart-qty[data-id="' + id + '"]');
+            if (!input) return;
+            let v = parseInt(input.value) + 1;
+            if (v < 1) v = 1;
+            input.value = v;
+            updateCartItem(id, v);
+        });
+    });
+
+    document.querySelectorAll('.cart-qty').forEach(input => {
+        input.addEventListener('change', function () {
+            const id = this.getAttribute('data-id');
+            let v = parseInt(this.value);
+            if (isNaN(v) || v < 1) { v = 1; this.value = 1; }
+            updateCartItem(id, v);
+        });
+    });
+
+    document.querySelectorAll('.remove-cart').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = this.getAttribute('data-id');
+            if (!confirm('Remove this item from cart?')) return;
+            fetch('/cart/remove/' + id).then(() => {
+                location.reload();
+            }).catch(() => showToast('Something went wrong', 'danger'));
+        });
+    });
+
+    // ---- Wishlist page: remove ----
+    document.querySelectorAll('.remove-wish').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = this.getAttribute('data-id');
+            if (!confirm('Remove this item from wishlist?')) return;
+            fetch('/wishlist/remove/' + id).then(() => {
+                location.reload();
+            }).catch(() => showToast('Something went wrong', 'danger'));
+        });
+    });
+
     // ---- AJAX add to wishlist ----
     document.querySelectorAll('form.add-to-wishlist-form').forEach(form => {
         form.addEventListener('submit', function (e) {
@@ -144,6 +199,18 @@ function updateWishlistBadge() {
             badge.style.display = d.count > 0 ? 'inline' : 'none';
         }
     }).catch(() => { });
+}
+
+function updateCartItem(cartId, quantity) {
+    const fd = new FormData();
+    fd.append('cart_id', cartId);
+    fd.append('quantity', quantity);
+    fetch('/cart/update', {
+        method: 'POST',
+        body: fd
+    }).then(() => {
+        location.reload();
+    }).catch(() => showToast('Something went wrong', 'danger'));
 }
 
 // ---- Admin: live preview of selected product image ----
