@@ -2,11 +2,10 @@ import sys
 import os
 
 # ====== PythonAnywhere WSGI config ======
-# Replace 'yourusername' with your actual PythonAnywhere username.
 # This file goes in the "WSGI configuration file" box on the
 # Web tab of your PythonAnywhere dashboard.
 
-PROJECT_DIR = "/home/yourusername/mini-daraz"   # <-- change to your path
+PROJECT_DIR = "/home/minidaraz12/mini-daraz"
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
