@@ -1,0 +1,36 @@
+{% extends "admin/base.html" %}
+{% block title %}Edit Product - Admin{% endblock %}
+{% block content %}
+<h2 class="mb-3">Edit Product</h2>
+<div class="card"><div class="card-body">
+    <form method="post" action="{{ url_for('admin_edit_product', product_id=product['id']) }}" enctype="multipart/form-data">
+        <div class="row">
+            <div class="col-md-6 mb-3"><label class="form-label">Name</label><input name="name" class="form-control" value="{{ product['name'] }}" required></div>
+            <div class="col-md-6 mb-3"><label class="form-label">Brand</label><input name="brand" class="form-control" value="{{ product['brand'] or '' }}"></div>
+            <div class="col-md-6 mb-3"><label class="form-label">Category</label><select name="category_id" class="form-select">{% for c in categories %}<option value="{{ c['id'] }}" {% if c['id']==product['category_id'] %}selected{% endif %}>{{ c['name'] }}</option>{% endfor %}</select></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Price (Rs.)</label><input name="price" type="number" step="0.01" class="form-control" value="{{ product['price'] }}" required></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Discount %</label><input name="discount" type="number" class="form-control" value="{{ product['discount'] or 0 }}"></div>
+            <div class="col-md-4 mb-3"><label class="form-label">Stock</label><input name="stock" type="number" class="form-control" value="{{ product['stock'] }}"></div>
+            <div class="col-md-4 mb-3"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" {% if product['status']=='active' %}selected{% endif %}>Active</option><option value="inactive" {% if product['status']=='inactive' %}selected{% endif %}>Inactive</option></select></div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Product Image (Upload)</label>
+                <input name="image" id="image" type="file" class="form-control" accept="image/jpg,image/jpeg,image/png,image/webp">
+                <small class="text-muted">Allowed: JPG, JPEG, PNG, WEBP (max 5 MB). Leave empty to keep the current image.</small>
+                <div class="mt-2">
+                    <img id="image-preview" src="{{ url_for('static', filename='images/products/' ~ (product['image'] or 'default-product.svg')) }}" alt="Preview" style="max-height:120px; border:1px solid #ddd; border-radius:8px; padding:4px;">
+                </div>
+            </div>
+        </div>
+        <div class="mb-3"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="3">{{ product['description'] or '' }}</textarea></div>
+        <div class="mb-3"><label class="form-label">Specifications</label><textarea name="specifications" class="form-control" rows="4">{{ product['specifications'] or '' }}</textarea></div>
+        <div class="mb-3">
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="is_flash_sale" value="1" {% if product['is_flash_sale'] %}checked{% endif %}> <label class="form-check-label">Flash Sale</label></div>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="is_new" value="1" {% if product['is_new'] %}checked{% endif %}> <label class="form-check-label">New</label></div>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="is_best_seller" value="1" {% if product['is_best_seller'] %}checked{% endif %}> <label class="form-check-label">Best Seller</label></div>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="is_trending" value="1" {% if product['is_trending'] %}checked{% endif %}> <label class="form-check-label">Trending</label></div>
+        </div>
+        <button class="btn btn-primary">Update Product</button>
+        <a href="{{ url_for('admin_products') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div></div>
+{% endblock %}

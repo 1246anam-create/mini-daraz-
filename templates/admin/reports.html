@@ -1,0 +1,33 @@
+{% extends "admin/base.html" %}
+{% block title %}Reports - Admin{% endblock %}
+{% block content %}
+<h2 class="mb-4">Reports & Analytics</h2>
+<div class="row g-3">
+    <div class="col-6 col-lg-3"><div class="stat-card"><i class="fas fa-shopping-bag"></i><h3>{{ total_orders }}</h3><span>Total Orders</span></div></div>
+    <div class="col-6 col-lg-3"><div class="stat-card"><i class="fas fa-rupee-sign"></i><h3>Rs. {{ "%.0f"|format(total_sales) }}</h3><span>Revenue</span></div></div>
+    <div class="col-6 col-lg-3"><div class="stat-card"><i class="fas fa-box"></i><h3>{{ total_products }}</h3><span>Products</span></div></div>
+    <div class="col-6 col-lg-3"><div class="stat-card"><i class="fas fa-users"></i><h3>{{ total_users }}</h3><span>Users</span></div></div>
+</div>
+<div class="card mt-4"><div class="card-body">
+    <h5>Orders by Status</h5>
+    <div class="table-responsive"><table class="table table-sm">
+        <thead><tr><th>Status</th><th>Count</th></tr></thead>
+        <tbody>
+        {% for r in status_counts %}
+        <tr><td>{{ r['status'] }}</td><td>{{ r['c'] }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+</div></div>
+<div class="card mt-3"><div class="card-body">
+    <h5>Top Selling Products</h5>
+    <div class="table-responsive"><table class="table table-sm">
+        <thead><tr><th>Product</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+        <tbody>
+        {% for p in best_sellers %}
+        <tr><td>{{ p['product_name'] }}</td><td>{{ p['qty'] }}</td><td>Rs. {{ "%.0f"|format(p['revenue'] or 0) }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+</div></div>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Mini Daraz - Online Shopping{% endblock %}
+
+{% macro product_card(p) %}
+<div class="col-6 col-md-4 col-lg-3 mb-4">
+    <div class="product-card">
+        <a href="{{ url_for('product_details', product_id=p['id']) }}">
+            <div class="product-img">
+                <img src="{{ url_for('static', filename='images/products/' ~ (p['image'] or 'default-product.svg')) }}" alt="{{ p['name'] }}" loading="lazy">
+                {% if p['discount'] and p['discount'] > 0 %}<span class="discount-badge">-{{ p['discount'] }}%</span>{% endif %}
+                {% if p['is_flash_sale'] %}<span class="flash-badge">Flash</span>{% endif %}
+            </div>
+        </a>
+        <div class="product-body">
+            <a href="{{ url_for('product_details', product_id=p['id']) }}" class="product-name">{{ p['name'] }}</a>
+            <div class="product-brand">{{ p['brand'] or '' }}</div>
+            <div class="product-price">
+                {% set dp = p['price'] - (p['price'] * p['discount'] / 100) if p['discount'] else p['price'] %}
+                <span class="current">Rs. {{ "%.0f"|format(dp) }}</span>
+                {% if p['discount'] and p['discount'] > 0 %}<span class="old">Rs. {{ "%.0f"|format(p['price']) }}</span>{% endif %}
+            </div>
+            <div class="product-rating">
+                {% for i in range(5) %}<i class="fa{{ 's' if i < (p['rating']|int) else 'r' }} fa-star"></i>{% endfor %}
+                <span>({{ p['rating'] or 0 }})</span>
+            </div>
+            <div class="product-actions">
+                <button class="btn btn-add-cart" data-product="{{ p['id'] }}"><i class="fas fa-cart-plus"></i> Add</button>
+                <button class="btn btn-add-wish" data-product="{{ p['id'] }}"><i class="far fa-heart"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<!-- Hero -->
+<section class="hero">
+    <div class="container">
+        <div class="hero-content">
+            <h1>Mega Sale is Live!</h1>
+            <p>Up to 70% off on mobiles, electronics, fashion & home.</p>
+            <a href="{{ url_for('products') }}" class="btn btn-shop">Shop Now</a>
+        </div>
+    </div>
+</section>
+
+<!-- Promo Banner -->
+<section class="home-banner py-3">
+    <div class="container">
+        <a href="{{ url_for('products') }}">
+            <img src="{{ url_for('static', filename='images/bannar.webp') }}" alt="Mini Daraz Promo Banner" class="img-fluid rounded w-100" style="object-fit:cover; max-height:320px;">
+        </a>
+    </div>
+</section>
+
+<!-- Flash Sale -->
+<section class="flash-sale py-4">
+    <div class="container">
+        <div class="section-head d-flex justify-content-between align-items-center">
+            <h3><i class="fas fa-bolt text-warning"></i> Flash Sale</h3>
+            <div class="flash-timer" id="flash-timer">00:00:00</div>
+        </div>
+        <div class="row">
+            {% for p in flash_products %}{{ product_card(p) }}{% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Categories -->
+<section class="py-4">
+    <div class="container">
+        <div class="section-head"><h3>Shop by Category</h3></div>
+        <div class="row category-grid">
+            {% for c in categories %}
+            <div class="col-6 col-md-3 mb-3">
+                <a href="{{ url_for('category_products', category_id=c['id']) }}" class="category-tile">
+                    <i class="fas fa-tags"></i><span>{{ c['name'] }}</span>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Popular -->
+<section class="py-4 bg-light">
+    <div class="container">
+        <div class="section-head"><h3>Popular Products</h3></div>
+        <div class="row">{% for p in popular_products %}{{ product_card(p) }}{% endfor %}</div>
+    </div>
+</section>
+
+<!-- New Arrivals -->
+<section class="py-4">
+    <div class="container">
+        <div class="section-head"><h3>New Arrivals</h3></div>
+        <div class="row">{% for p in new_products %}{{ product_card(p) }}{% endfor %}</div>
+    </div>
+</section>
+
+<!-- Best Sellers -->
+<section class="py-4 bg-light">
+    <div class="container">
+        <div class="section-head"><h3>Best Sellers</h3></div>
+        <div class="row">{% for p in best_products %}{{ product_card(p) }}{% endfor %}</div>
+    </div>
+</section>
+
+<!-- Trending -->
+<section class="py-4">
+    <div class="container">
+        <div class="section-head"><h3>Trending Now</h3></div>
+        <div class="row">{% for p in trending_products %}{{ product_card(p) }}{% endfor %}</div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% block title %}Order Details - Admin{% endblock %}
+{% block content %}
+<h2 class="mb-3">Order {{ order['order_number'] }}</h2>
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-3"><div class="card-body">
+            <h5>Items</h5>
+            {% for it in items %}
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <div><strong>{{ it['product_name'] }}</strong> x{{ it['quantity'] }}</div>
+                <div>Rs. {{ "%.0f"|format(it['price'] * it['quantity']) }}</div>
+            </div>
+            {% endfor %}
+        </div></div>
+        <div class="card"><div class="card-body">
+            <h5>Customer & Shipping</h5>
+            <p>{{ order['customer_name'] }}<br>{{ order['address'] }}, {{ order['city'] }} {{ order['postal_code'] }}<br>{{ order['phone'] }} | {{ order['email'] }}</p>
+        </div></div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card"><div class="card-body">
+            <h5>Update Status</h5>
+            <form method="post" action="{{ url_for('admin_update_order_status', order_id=order['id']) }}">
+                <select name="status" class="form-select mb-2">
+                    {% for s in ['Pending','Confirmed','Processing','Shipped','Delivered','Cancelled'] %}
+                    <option value="{{ s }}" {% if s==order['status'] %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-primary w-100">Update</button>
+            </form>
+            <hr>
+            <div class="d-flex justify-content-between"><span>Subtotal</span><span>Rs. {{ "%.0f"|format(order['subtotal']) }}</span></div>
+            <div class="d-flex justify-content-between"><span>Delivery</span><span>Rs. {{ "%.0f"|format(order['delivery_charge']) }}</span></div>
+            {% if order['discount'] > 0 %}<div class="d-flex justify-content-between text-success"><span>Discount</span><span>- Rs. {{ "%.0f"|format(order['discount']) }}</span></div>{% endif %}
+            <hr>
+            <div class="d-flex justify-content-between fw-bold"><span>Total</span><span>Rs. {{ "%.0f"|format(order['total']) }}</span></div>
+        </div></div>
+    </div>
+</div>
+{% endblock %}

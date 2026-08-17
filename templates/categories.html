@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Categories - Mini Daraz{% endblock %}
+{% block content %}
+<section class="py-4">
+    <div class="container">
+        <h2 class="mb-4">All Categories</h2>
+        <div class="row">
+            {% for c in categories %}
+            <div class="col-6 col-md-3 mb-4">
+                <a href="{{ url_for('category_products', category_id=c['id']) }}" class="category-tile big">
+                    <i class="fas fa-tags"></i>
+                    <span>{{ c['name'] }}</span>
+                    {% if c['description'] %}<small>{{ c['description'] }}</small>{% endif %}
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

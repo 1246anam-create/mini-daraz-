@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Track Order - Mini Daraz{% endblock %}
+{% block content %}
+<section class="py-4">
+    <div class="container">
+        <h2 class="mb-4">Track Your Order</h2>
+        <form method="post" class="mb-4" style="max-width:500px">
+            <div class="input-group">
+                <input name="order_number" class="form-control" placeholder="Enter Order Number (e.g. MD2026...)" value="{{ order_number or '' }}" required>
+                <button class="btn btn-primary">Track</button>
+            </div>
+        </form>
+        {% if order %}
+        <div class="card"><div class="card-body">
+            <h5>{{ order['order_number'] }}</h5>
+            <p>Status: <span class="badge bg-info">{{ order['status'] }}</span> | Total: Rs. {{ "%.0f"|format(order['total']) }}</p>
+            <div class="tracking-steps my-3 d-flex flex-wrap gap-3">
+                {% set steps = ['Pending','Confirmed','Processing','Shipped','Delivered'] %}
+                {% for s in steps %}<div class="step {% if loop.index0 <= steps.index(order['status']) %}active{% endif %}"><div class="step-dot">{{ loop.index }}</div><span>{{ s }}</span></div>{% endfor %}
+            </div>
+        </div></div>
+        {% elif order_number %}
+        <div class="alert alert-warning">Order not found.</div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

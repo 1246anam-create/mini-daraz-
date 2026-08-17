@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ product['name'] }} - Mini Daraz{% endblock %}
+{% block content %}
+<section class="py-4">
+    <div class="container">
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li><li class="breadcrumb-item"><a href="{{ url_for('products') }}">Products</a></li><li class="breadcrumb-item active">{{ product['name'] }}</li></ol></nav>
+        <div class="row">
+            <div class="col-md-5">
+                <div class="detail-img">
+                    <img src="{{ url_for('static', filename='images/products/' ~ (product['image'] or 'default-product.svg')) }}" alt="{{ product['name'] }}" class="img-fluid">
+                </div>
+            </div>
+            <div class="col-md-7">
+                <h2>{{ product['name'] }}</h2>
+                <div class="product-brand mb-2">{{ product['brand'] or '' }}</div>
+                <div class="product-rating mb-2">
+                    {% for i in range(5) %}<i class="fa{{ 's' if i < (product['rating']|int) else 'r' }} fa-star"></i>{% endfor %}
+                    <span>{{ product['rating'] or 0 }} ({{ reviews|length }} reviews)</span>
+                </div>
+                <div class="detail-price mb-3">
+                    {% set dp = product['price'] - (product['price'] * product['discount'] / 100) if product['discount'] else product['price'] %}
+                    <span class="current fs-3">Rs. {{ "%.0f"|format(dp) }}</span>
+                    {% if product['discount'] and product['discount'] > 0 %}<span class="old fs-5">Rs. {{ "%.0f"|format(product['price']) }}</span><span class="discount-badge">-{{ product['discount'] }}%</span>{% endif %}
+                </div>
+                <p>{{ product['description'] }}</p>
+                <div class="mb-3">{% if product['stock'] > 0 %}<span class="badge bg-success">In Stock ({{ product['stock'] }})</span>{% else %}<span class="badge bg-danger">Out of Stock</span>{% endif %}</div>
+                {% if product['stock'] > 0 %}
+                <div class="qty-stepper mb-3">
+                    <button id="qty-minus" class="btn">-</button>
+                    <input type="number" id="qty" value="1" min="1" max="{{ product['stock'] }}" class="form-control d-inline-block" style="width:70px">
+                    <button id="qty-plus" class="btn">+</button>
+                </div>
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-primary btn-lg" id="add-to-cart-btn" data-product="{{ product['id'] }}"><i class="fas fa-cart-plus"></i> Add to Cart</button>
+                    <button class="btn btn-outline-danger btn-lg" id="add-to-wish-btn" data-product="{{ product['id'] }}"><i class="far fa-heart"></i></button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if product['specifications'] %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <h4>Specifications</h4>
+                <table class="table table-bordered spec-table">
+                    {% for line in product['specifications'].split('\n') %}
+                        {% if line and ':' in line %}{% set parts = line.split(':', 1) %}<tr><th>{{ parts[0].strip() }}</th><td>{{ parts[1].strip() }}</td></tr>{% endif %}
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Reviews -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h4>Customer Reviews</h4>
+                {% if session.get('user_id') %}
+                <form method="post" action="{{ url_for('add_review', product_id=product['id']) }}" class="mb-3">
+                    <div class="star-input mb-2">
+                        {% for i in range(5,0,-1) %}<input type="radio" name="rating" id="star{{ i }}" value="{{ i }}"><label for="star{{ i }}">&#9733;</label>{% endfor %}
+                    </div>
+                    <textarea name="comment" class="form-control mb-2" placeholder="Write your review..."></textarea>
+                    <button class="btn btn-primary">Submit Review</button>
+                </form>
+                {% else %}
+                <p><a href="{{ url_for('login') }}">Login</a> to write a review.</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                {% for r in reviews %}
+                <div class="review-item border-bottom pb-2 mb-2">
+                    <div class="product-rating">{% for i in range(5) %}<i class="fa{{ 's' if i < r['rating'] else 'r' }} fa-star"></i>{% endfor %}</div>
+                    <p class="mb-1">{{ r['comment'] }}</p>
+                    <small class="text-muted">{{ r['full_name'] or 'User' }}</small>
+                </div>
+                {% else %}<p>No reviews yet.</p>{% endfor %}
+            </div>
+        </div>
+
+        {% if related %}
+        <div class="mt-4"><h4>Related Products</h4><div class="row">
+            {% for p in related %}
+            <div class="col-6 col-md-3 mb-3">
+                <div class="product-card">
+                    <a href="{{ url_for('product_details', product_id=p['id']) }}"><div class="product-img"><img src="{{ url_for('static', filename='images/products/' ~ (p['image'] or 'default-product.svg')) }}" alt="{{ p['name'] }}"></div></a>
+                    <div class="product-body"><a href="{{ url_for('product_details', product_id=p['id']) }}" class="product-name">{{ p['name'] }}</a>
+                    <div class="product-price"><span class="current">Rs. {{ "%.0f"|format(p['price'] - (p['price']*p['discount']/100) if p['discount'] else p['price']) }}</span></div></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div></div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('qty-minus')?.addEventListener('click', () => { const q=document.getElementById('qty'); q.value=Math.max(1, parseInt(q.value)-1); });
+document.getElementById('qty-plus')?.addEventListener('click', () => { const q=document.getElementById('qty'); q.value=Math.min(parseInt(q.max)||99, parseInt(q.value)+1); });
+</script>
+{% endblock %}
