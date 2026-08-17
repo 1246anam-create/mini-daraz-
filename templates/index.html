@@ -51,7 +51,7 @@
             <div class="col-lg-6 hero-content">
                 <h1>{{ site_settings['hero_title'] if site_settings and site_settings['hero_title'] else 'Mega Sale is Live!' }}</h1>
                 <p>{{ site_settings['hero_subtitle'] if site_settings and site_settings['hero_subtitle'] else 'Up to 70% off on mobiles, electronics, fashion & home.' }}</p>
-                <a href="{{ url_for('products') }}" class="btn btn-shop">{{ site_settings['hero_cta'] if site_settings and site_settings['hero_cta'] else 'Shop Now' }}</a>
+                <a href="{{ url_for('products') }}" class="btn btn-shop">Shop Now</a>
             </div>
             <div class="col-lg-6 text-center">
                 <img src="{{ url_for('static', filename='images/products/shopping.webp') }}" alt="Mega Sale" class="img-fluid hero-img">
