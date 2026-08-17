@@ -39,6 +39,26 @@ def seed():
         )
         print("Admin password reset -> admin@minidaraz.com / admin123")
 
+    # ---- Demo customer ----
+    # Ensure a working regular-user account exists and is active, so the
+    # customer login (/login) always works for demos/presentations.
+    existing_user = query("SELECT id FROM users WHERE email = %s" % PH, ("customer@minidaraz.com",), one=True)
+    if not existing_user:
+        execute(
+            "INSERT INTO users (full_name, email, phone, password, status, created_at) VALUES (%s, %s, %s, %s, %s, %s)" % (PH, PH, PH, PH, PH, PH),
+            ("Demo Customer", "customer@minidaraz.com", "03001234567", generate_password_hash("customer123"), "active", "2026-01-01 00:00:00"),
+        )
+        print("Customer created -> customer@minidaraz.com / customer123")
+    else:
+        execute(
+            "UPDATE users SET password = %s, status = 'active' WHERE email = %s" % (PH, PH),
+            (generate_password_hash("customer123"), "customer@minidaraz.com"),
+        )
+        print("Customer password reset -> customer@minidaraz.com / customer123")
+
+    # Activate any existing (inactive) user accounts so they can log in.
+    execute("UPDATE users SET status = 'active' WHERE status IS NULL OR status != 'active'")
+
     # ---- Categories ----
     categories = [
         ("Electronics", "Gadgets & devices"),
