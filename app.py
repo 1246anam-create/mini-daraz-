@@ -5,7 +5,7 @@ A modern, professional, responsive and fully functional e-commerce platform.
 
 Frontend : HTML5, CSS3, JavaScript, Bootstrap
 Backend  : Python Flask
-Database : PostgreSQL (with automatic SQLite fallback for local dev)
+Database : SQLite
 
 Run:  python app.py
 """
@@ -23,7 +23,17 @@ from flask import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-from db import query, execute, init_db, USE_POSTGRES
+from db import query, execute, init_db
+
+import logging
+import traceback
+
+# Log all errors to app.log so they are visible on PythonAnywhere / any host.
+logging.basicConfig(
+    filename=os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.log"),
+    level=logging.ERROR,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -87,10 +97,25 @@ def discounted_price(price, discount):
         return float(price or 0)
 
 
+def format_datetime(value, fmt="%d %b, %I:%M %p"):
+    """Format a datetime that may arrive as a string (SQLite) or datetime object."""
+    if not value:
+        return ""
+    if isinstance(value, str):
+        try:
+            value = datetime.strptime(value[:19], "%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
+            return value  # already a formatted string
+    try:
+        return value.strftime(fmt)
+    except (ValueError, TypeError, AttributeError):
+        return str(value)
+
+
 def cart_count():
     if "user_id" in session:
         row = query(
-            "SELECT COALESCE(SUM(quantity),0) AS c FROM cart WHERE user_id = %s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            "SELECT COALESCE(SUM(quantity),0) AS c FROM cart WHERE user_id = ?",
             (session["user_id"],), one=True,
         )
         return row["c"] or 0
@@ -100,7 +125,7 @@ def cart_count():
 def wishlist_count():
     if "user_id" in session:
         row = query(
-            "SELECT COUNT(*) AS c FROM wishlist WHERE user_id = %s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            "SELECT COUNT(*) AS c FROM wishlist WHERE user_id = ?",
             (session["user_id"],), one=True,
         )
         return row["c"] or 0
@@ -108,7 +133,7 @@ def wishlist_count():
 
 
 def get_cart_items(user_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     return query(
         f"""
         SELECT c.id AS cart_id, c.quantity, p.*, c.quantity * p.price AS line_total
@@ -143,7 +168,7 @@ def cart_summary(user_id):
 
 
 def get_product(product_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     return query(
         f"""
         SELECT p.*, c.name AS category_name
@@ -156,7 +181,7 @@ def get_product(product_id):
 
 
 def product_rating(product_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     row = query(
         f"SELECT AVG(rating) AS avg_r, COUNT(*) AS cnt FROM reviews WHERE product_id = {ph}",
         (product_id,), one=True,
@@ -178,9 +203,25 @@ def inject_globals():
         "cart_count": cart_count(),
         "wishlist_count": wishlist_count(),
         "current_year": datetime.now().year,
-        "db_engine": "PostgreSQL" if USE_POSTGRES else "SQLite (PostgreSQL-ready)",
+        "db_engine": "SQLite",
         "query": query,
+        "site_settings": get_settings(),
     }
+
+
+# Make the datetime formatter available in all templates
+app.jinja_env.globals["format_datetime"] = format_datetime
+
+
+def get_settings():
+    """Return the single site settings row (logo / slideshow video)."""
+    try:
+        row = query("SELECT * FROM settings ORDER BY id LIMIT 1", one=True)
+    except Exception:
+        row = None
+    if not row:
+        row = {"logo": None, "slideshow_video": None, "slideshow_poster": None}
+    return row
 
 
 # ---------------------------------------------------------------------------
@@ -188,28 +229,20 @@ def inject_globals():
 # ---------------------------------------------------------------------------
 @app.route("/")
 def index():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     categories = query("SELECT * FROM categories ORDER BY name")
     flash_sale = query(
-        f"SELECT * FROM products WHERE status='active' AND is_flash_sale=1 ORDER BY discount DESC LIMIT 8"
-        if not USE_POSTGRES else
-        "SELECT * FROM products WHERE status='active' AND is_flash_sale=TRUE ORDER BY discount DESC LIMIT 8"
+        "SELECT * FROM products WHERE status='active' AND is_flash_sale=1 ORDER BY discount DESC LIMIT 8"
     )
     popular = query("SELECT * FROM products WHERE status='active' ORDER BY rating DESC, stock DESC LIMIT 8")
     new_arrivals = query(
-        f"SELECT * FROM products WHERE status='active' AND is_new=1 ORDER BY id DESC LIMIT 8"
-        if not USE_POSTGRES else
-        "SELECT * FROM products WHERE status='active' AND is_new=TRUE ORDER BY id DESC LIMIT 8"
+        "SELECT * FROM products WHERE status='active' AND is_new=1 ORDER BY id DESC LIMIT 8"
     )
     best_sellers = query(
-        f"SELECT * FROM products WHERE status='active' AND is_best_seller=1 ORDER BY id DESC LIMIT 8"
-        if not USE_POSTGRES else
-        "SELECT * FROM products WHERE status='active' AND is_best_seller=TRUE ORDER BY id DESC LIMIT 8"
+        "SELECT * FROM products WHERE status='active' AND is_best_seller=1 ORDER BY id DESC LIMIT 8"
     )
     trending = query(
-        f"SELECT * FROM products WHERE status='active' AND is_trending=1 ORDER BY id DESC LIMIT 8"
-        if not USE_POSTGRES else
-        "SELECT * FROM products WHERE status='active' AND is_trending=TRUE ORDER BY id DESC LIMIT 8"
+        "SELECT * FROM products WHERE status='active' AND is_trending=1 ORDER BY id DESC LIMIT 8"
     )
     special = query("SELECT * FROM products WHERE status='active' AND discount > 0 ORDER BY discount DESC LIMIT 8")
     return render_template(
@@ -226,7 +259,7 @@ def index():
 
 @app.route("/products")
 def products():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     search = request.args.get("q", "").strip()
     category_id = request.args.get("category", "")
     brand = request.args.get("brand", "").strip()
@@ -250,7 +283,7 @@ def products():
         params.append(category_id)
 
     if brand:
-        where.append(f"p.brand ILIKE {ph}" if USE_POSTGRES else f"p.brand LIKE {ph}")
+        where.append(f"p.brand LIKE {ph}")
         params.append(f"%{brand}%")
 
     if min_price:
@@ -321,7 +354,7 @@ def products():
 
 @app.route("/product/<int:product_id>")
 def product_details(product_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     product = get_product(product_id)
     if not product:
         abort(404)
@@ -346,7 +379,7 @@ def product_details(product_id):
         (product["category_id"], product_id),
     )
     if not related:
-        related = query("SELECT * FROM products WHERE status='active' AND id != %s ORDER BY id DESC LIMIT 4".replace("%s", "?" if not USE_POSTGRES else "%s"), (product_id,))
+        related = query("SELECT * FROM products WHERE status='active' AND id != ? ORDER BY id DESC LIMIT 4", (product_id,))
 
     in_cart = False
     in_wishlist = False
@@ -384,7 +417,7 @@ def categories_page():
 
 @app.route("/category/<int:category_id>")
 def category_products(category_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     cat = query("SELECT * FROM categories WHERE id = %s" % ph, (category_id,), one=True)
     if not cat:
         abort(404)
@@ -424,7 +457,7 @@ def signup():
         if password != confirm:
             errors.append("Passwords do not match.")
 
-        existing = query("SELECT id FROM users WHERE email = %s".replace("%s", "?" if not USE_POSTGRES else "%s"), (email,), one=True)
+        existing = query("SELECT id FROM users WHERE email = ?", (email,), one=True)
         if existing:
             errors.append("An account with this email already exists.")
 
@@ -435,7 +468,7 @@ def signup():
 
         hashed = generate_password_hash(password)
         execute(
-            "INSERT INTO users (full_name, email, phone, password) VALUES (%s, %s, %s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            "INSERT INTO users (full_name, email, phone, password) VALUES (?, ?, ?, ?)",
             (full_name, email, phone, hashed),
         )
         flash("Account created successfully! Please login.", "success")
@@ -449,7 +482,7 @@ def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        user = query("SELECT * FROM users WHERE email = %s".replace("%s", "?" if not USE_POSTGRES else "%s"), (email,), one=True)
+        user = query("SELECT * FROM users WHERE email = ?", (email,), one=True)
 
         if not user or not check_password_hash(user["password"], password):
             flash("Invalid email or password.", "danger")
@@ -482,7 +515,7 @@ def logout():
 @app.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     user = query("SELECT * FROM users WHERE id = %s" % ph, (session["user_id"],), one=True)
     if request.method == "POST":
         full_name = request.form.get("full_name", "").strip()
@@ -491,7 +524,7 @@ def profile():
         city = request.form.get("city", "").strip()
         postal_code = request.form.get("postal_code", "").strip()
         execute(
-            "UPDATE users SET full_name=%s, phone=%s, address=%s, city=%s, postal_code=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            "UPDATE users SET full_name=?, phone=?, address=?, city=?, postal_code=? WHERE id=?",
             (full_name, phone, address, city, postal_code, session["user_id"]),
         )
         session["user_name"] = full_name
@@ -503,7 +536,7 @@ def profile():
 @app.route("/change-password", methods=["POST"])
 @login_required
 def change_password():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     current = request.form.get("current_password", "")
     new_pass = request.form.get("new_password", "")
     confirm = request.form.get("confirm_password", "")
@@ -516,7 +549,7 @@ def change_password():
     elif new_pass != confirm:
         flash("New passwords do not match.", "danger")
     else:
-        execute("UPDATE users SET password=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("UPDATE users SET password=? WHERE id=?",
                 (generate_password_hash(new_pass), session["user_id"]))
         flash("Password changed successfully!", "success")
     return redirect(url_for("profile"))
@@ -535,7 +568,7 @@ def cart():
 @app.route("/cart/add", methods=["POST"])
 @login_required
 def add_to_cart():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     product_id = request.form.get("product_id")
     quantity = int(request.form.get("quantity", 1) or 1)
     product = query("SELECT * FROM products WHERE id = %s" % ph, (product_id,), one=True)
@@ -543,28 +576,30 @@ def add_to_cart():
         flash("Product not found.", "danger")
         return redirect(url_for("products"))
 
-    existing = query("SELECT * FROM cart WHERE user_id=%s AND product_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    existing = query("SELECT * FROM cart WHERE user_id=? AND product_id=?",
                      (session["user_id"], product_id), one=True)
     if existing:
         new_qty = min(existing["quantity"] + quantity, product["stock"] if product["stock"] > 0 else 99)
-        execute("UPDATE cart SET quantity=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("UPDATE cart SET quantity=? WHERE id=?",
                 (new_qty, existing["id"]))
     else:
-        execute("INSERT INTO cart (user_id, product_id, quantity) VALUES (%s, %s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)",
                 (session["user_id"], product_id, quantity))
     flash("Product added to cart!", "success")
+    if request.form.get("buy_now") or request.args.get("buy_now"):
+        return redirect(url_for("checkout"))
     return redirect(request.referrer or url_for("cart"))
 
 
 @app.route("/cart/update", methods=["POST"])
 @login_required
 def update_cart():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     cart_id = request.form.get("cart_id")
     quantity = int(request.form.get("quantity", 1) or 1)
     if quantity < 1:
         quantity = 1
-    execute("UPDATE cart SET quantity=%s WHERE id=%s AND user_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    execute("UPDATE cart SET quantity=? WHERE id=? AND user_id=?",
             (quantity, cart_id, session["user_id"]))
     flash("Cart updated.", "info")
     return redirect(url_for("cart"))
@@ -573,7 +608,7 @@ def update_cart():
 @app.route("/cart/remove/<int:cart_id>")
 @login_required
 def remove_from_cart(cart_id):
-    execute("DELETE FROM cart WHERE id=%s AND user_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    execute("DELETE FROM cart WHERE id=? AND user_id=?",
             (cart_id, session["user_id"]))
     flash("Product removed from cart.", "info")
     return redirect(url_for("cart"))
@@ -585,7 +620,7 @@ def remove_from_cart(cart_id):
 @app.route("/wishlist")
 @login_required
 def wishlist():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     items = query(
         f"""
         SELECT w.id AS wish_id, p.*
@@ -602,14 +637,14 @@ def wishlist():
 @app.route("/wishlist/add", methods=["POST"])
 @login_required
 def add_to_wishlist():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     product_id = request.form.get("product_id")
-    existing = query("SELECT id FROM wishlist WHERE user_id=%s AND product_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    existing = query("SELECT id FROM wishlist WHERE user_id=? AND product_id=?",
                      (session["user_id"], product_id), one=True)
     if existing:
         flash("Product already in wishlist.", "info")
     else:
-        execute("INSERT INTO wishlist (user_id, product_id) VALUES (%s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("INSERT INTO wishlist (user_id, product_id) VALUES (?, ?)",
                 (session["user_id"], product_id))
         flash("Product added to wishlist!", "success")
     return redirect(request.referrer or url_for("wishlist"))
@@ -618,7 +653,7 @@ def add_to_wishlist():
 @app.route("/wishlist/remove/<int:wish_id>")
 @login_required
 def remove_from_wishlist(wish_id):
-    execute("DELETE FROM wishlist WHERE id=%s AND user_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    execute("DELETE FROM wishlist WHERE id=? AND user_id=?",
             (wish_id, session["user_id"]))
     flash("Product removed from wishlist.", "info")
     return redirect(url_for("wishlist"))
@@ -627,16 +662,16 @@ def remove_from_wishlist(wish_id):
 @app.route("/wishlist/move-to-cart/<int:wish_id>")
 @login_required
 def move_to_cart(wish_id):
-    ph = "?" if not USE_POSTGRES else "%s"
-    item = query("SELECT * FROM wishlist WHERE id=%s AND user_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    ph = "?"
+    item = query("SELECT * FROM wishlist WHERE id=? AND user_id=?",
                  (wish_id, session["user_id"]), one=True)
     if item:
-        existing = query("SELECT * FROM cart WHERE user_id=%s AND product_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        existing = query("SELECT * FROM cart WHERE user_id=? AND product_id=?",
                          (session["user_id"], item["product_id"]), one=True)
         if existing:
             execute("UPDATE cart SET quantity=quantity+1 WHERE id=%s" % ph, (existing["id"],))
         else:
-            execute("INSERT INTO cart (user_id, product_id, quantity) VALUES (%s, %s, 1)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            execute("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, 1)",
                     (session["user_id"], item["product_id"]))
         execute("DELETE FROM wishlist WHERE id=%s" % ph, (wish_id,))
         flash("Product moved to cart!", "success")
@@ -662,7 +697,7 @@ def wishlist_count_api():
 @app.route("/checkout", methods=["GET", "POST"])
 @login_required
 def checkout():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     summary = cart_summary(session["user_id"])
     if not summary["items"]:
         flash("Your cart is empty. Add products before checkout.", "warning")
@@ -698,7 +733,7 @@ def checkout():
         order_number = generate_order_number()
         execute(
             "INSERT INTO orders (order_number, user_id, customer_name, phone, email, address, city, postal_code, payment_method, subtotal, delivery_charge, discount, total) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (order_number, session["user_id"], customer_name, phone, email, address, city, postal_code,
              payment_method, summary["subtotal"], summary["delivery"], summary["discount"], summary["total"]),
         )
@@ -707,12 +742,12 @@ def checkout():
         for item in summary["items"]:
             execute(
                 "INSERT INTO order_items (order_id, product_id, product_name, product_image, price, quantity, subtotal) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (order["id"], item["id"], item["name"], item["image"],
                  discounted_price(item["price"], item["discount"]), item["quantity"],
                  round(discounted_price(item["price"], item["discount"]) * item["quantity"], 2)),
             )
-            execute("UPDATE products SET stock = stock - %s WHERE id = %s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            execute("UPDATE products SET stock = stock - ? WHERE id = ?",
                     (item["quantity"], item["id"]))
 
         execute("DELETE FROM cart WHERE user_id = %s" % ph, (session["user_id"],))
@@ -726,8 +761,8 @@ def checkout():
 @app.route("/order-confirmation/<order_number>")
 @login_required
 def order_confirmation(order_number):
-    ph = "?" if not USE_POSTGRES else "%s"
-    order = query("SELECT * FROM orders WHERE order_number=%s AND user_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    ph = "?"
+    order = query("SELECT * FROM orders WHERE order_number=? AND user_id=?",
                   (order_number, session["user_id"]), one=True)
     if not order:
         abort(404)
@@ -738,7 +773,7 @@ def order_confirmation(order_number):
 @app.route("/orders")
 @login_required
 def orders():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     order_list = query("SELECT * FROM orders WHERE user_id=%s ORDER BY id DESC" % ph, (session["user_id"],))
     return render_template("orders.html", orders=order_list)
 
@@ -746,8 +781,8 @@ def orders():
 @app.route("/order/<int:order_id>")
 @login_required
 def order_details(order_id):
-    ph = "?" if not USE_POSTGRES else "%s"
-    order = query("SELECT * FROM orders WHERE id=%s AND user_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    ph = "?"
+    order = query("SELECT * FROM orders WHERE id=? AND user_id=?",
                   (order_id, session["user_id"]), one=True)
     if not order:
         abort(404)
@@ -760,7 +795,7 @@ def track_order():
     order = None
     if request.method == "POST":
         order_number = request.form.get("order_number", "").strip()
-        ph = "?" if not USE_POSTGRES else "%s"
+        ph = "?"
         order = query("SELECT * FROM orders WHERE order_number=%s" % ph, (order_number,), one=True)
         if not order:
             flash("No order found with that Order ID.", "danger")
@@ -773,7 +808,7 @@ def track_order():
 @app.route("/product/<int:product_id>/review", methods=["POST"])
 @login_required
 def add_review(product_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     rating = int(request.form.get("rating", 0))
     comment = request.form.get("comment", "").strip()
 
@@ -781,19 +816,19 @@ def add_review(product_id):
         flash("Please select a rating between 1 and 5 stars.", "danger")
         return redirect(url_for("product_details", product_id=product_id))
 
-    existing = query("SELECT id FROM reviews WHERE user_id=%s AND product_id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+    existing = query("SELECT id FROM reviews WHERE user_id=? AND product_id=?",
                      (session["user_id"], product_id), one=True)
     if existing:
-        execute("UPDATE reviews SET rating=%s, comment=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("UPDATE reviews SET rating=?, comment=? WHERE id=?",
                 (rating, comment, existing["id"]))
         flash("Your review has been updated!", "success")
     else:
-        execute("INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (%s, %s, %s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (?, ?, ?, ?)",
                 (session["user_id"], product_id, rating, comment))
         flash("Thank you for your review!", "success")
 
     avg, cnt = product_rating(product_id)
-    execute("UPDATE products SET rating=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"), (avg, product_id))
+    execute("UPDATE products SET rating=? WHERE id=?", (avg, product_id))
     return redirect(url_for("product_details", product_id=product_id))
 
 
@@ -818,12 +853,37 @@ def contact():
             flash("Please fill in all required fields.", "danger")
         else:
             execute(
-                "INSERT INTO contact_messages (full_name, email, phone, subject, message) VALUES (%s, %s, %s, %s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+                "INSERT INTO contact_messages (full_name, email, phone, subject, message) VALUES (?, ?, ?, ?, ?)",
                 (full_name, email, phone, subject, message),
             )
             flash("Your message has been sent! Our support team will contact you soon.", "success")
             return redirect(url_for("contact"))
     return render_template("contact.html")
+
+
+@app.route("/messages", methods=["GET", "POST"])
+@login_required
+def messages():
+    """Customer support chat: logged-in users send messages and see admin replies."""
+    ph = "?"
+    uid = session.get("user_id")
+    user = query("SELECT * FROM users WHERE id=%s" % ph, (uid,), one=True)
+
+    if request.method == "POST":
+        message = request.form.get("message", "").strip()
+        if message:
+            execute(
+                "INSERT INTO contact_messages (full_name, email, phone, subject, message, user_id) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (user["full_name"], user["email"], user.get("phone", ""), "Support Chat", message, uid),
+            )
+            flash("Message sent! Our support team will reply soon.", "success")
+            return redirect(url_for("messages"))
+
+    thread = query(
+        "SELECT * FROM contact_messages WHERE user_id=%s ORDER BY created_at ASC" % ph, (uid,)
+    )
+    return render_template("messages.html", thread=thread, user=user)
 
 
 # ---------------------------------------------------------------------------
@@ -834,7 +894,7 @@ def admin_login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        admin = query("SELECT * FROM admins WHERE email = %s".replace("%s", "?" if not USE_POSTGRES else "%s"), (email,), one=True)
+        admin = query("SELECT * FROM admins WHERE email = ?", (email,), one=True)
         if not admin or not check_password_hash(admin["password"], password):
             flash("Invalid admin credentials.", "danger")
             return render_template("admin/login.html")
@@ -859,7 +919,7 @@ def admin_logout():
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     stats = {
         "products": query("SELECT COUNT(*) AS c FROM products", one=True)["c"],
         "categories": query("SELECT COUNT(*) AS c FROM categories", one=True)["c"],
@@ -882,12 +942,6 @@ def admin_dashboard():
     low_stock = query("SELECT * FROM products WHERE stock <= 5 ORDER BY stock ASC LIMIT 6")
     monthly_sales = query(
         f"""
-        SELECT TO_CHAR(created_at, 'YYYY-MM') AS month, SUM(total) AS sales
-        FROM orders WHERE status != 'Cancelled'
-        GROUP BY month ORDER BY month DESC LIMIT 6
-        """
-        if USE_POSTGRES else
-        f"""
         SELECT strftime('%Y-%m', created_at) AS month, SUM(total) AS sales
         FROM orders WHERE status != 'Cancelled'
         GROUP BY month ORDER BY month DESC LIMIT 6
@@ -909,12 +963,10 @@ def admin_dashboard():
 @app.route("/admin/products")
 @admin_required
 def admin_products():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     search = request.args.get("q", "").strip()
     if search:
         product_list = query(
-            f"SELECT p.*, c.name AS category_name FROM products p JOIN categories c ON c.id=p.category_id WHERE p.name ILIKE {ph} OR p.brand ILIKE {ph} ORDER BY p.id DESC"
-            if USE_POSTGRES else
             f"SELECT p.*, c.name AS category_name FROM products p JOIN categories c ON c.id=p.category_id WHERE p.name LIKE {ph} OR p.brand LIKE {ph} ORDER BY p.id DESC",
             (f"%{search}%", f"%{search}%"),
         )
@@ -928,7 +980,7 @@ def admin_products():
 @app.route("/admin/products/add", methods=["GET", "POST"])
 @admin_required
 def admin_add_product():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     categories = query("SELECT * FROM categories ORDER BY name")
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -980,7 +1032,7 @@ def admin_add_product():
 
         execute(
             "INSERT INTO products (category_id, name, brand, description, specifications, price, discount, stock, image, status, is_flash_sale, is_new, is_best_seller, is_trending) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (category_id, name, brand, description, specifications, price, discount, stock, image, status,
              is_flash_sale, is_new, is_best_seller, is_trending),
         )
@@ -992,7 +1044,7 @@ def admin_add_product():
 @app.route("/admin/products/edit/<int:product_id>", methods=["GET", "POST"])
 @admin_required
 def admin_edit_product(product_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     product = query("SELECT * FROM products WHERE id=%s" % ph, (product_id,), one=True)
     if not product:
         abort(404)
@@ -1023,7 +1075,7 @@ def admin_edit_product(product_id):
                 image = fname
 
         execute(
-            "UPDATE products SET category_id=%s, name=%s, brand=%s, description=%s, specifications=%s, price=%s, discount=%s, stock=%s, image=%s, status=%s, is_flash_sale=%s, is_new=%s, is_best_seller=%s, is_trending=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+            "UPDATE products SET category_id=?, name=?, brand=?, description=?, specifications=?, price=?, discount=?, stock=?, image=?, status=?, is_flash_sale=?, is_new=?, is_best_seller=?, is_trending=? WHERE id=?",
             (category_id, name, brand, description, specifications, price, discount, stock, image, status,
              is_flash_sale, is_new, is_best_seller, is_trending, product_id),
         )
@@ -1035,7 +1087,7 @@ def admin_edit_product(product_id):
 @app.route("/admin/products/delete/<int:product_id>")
 @admin_required
 def admin_delete_product(product_id):
-    execute("DELETE FROM products WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"), (product_id,))
+    execute("DELETE FROM products WHERE id=?", (product_id,))
     flash("Product deleted.", "info")
     return redirect(url_for("admin_products"))
 
@@ -1046,7 +1098,7 @@ def admin_delete_product(product_id):
 @app.route("/admin/categories", methods=["GET", "POST"])
 @admin_required
 def admin_categories():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         description = request.form.get("description", "").strip()
@@ -1057,7 +1109,7 @@ def admin_categories():
             if existing:
                 flash("Category already exists.", "danger")
             else:
-                execute("INSERT INTO categories (name, description) VALUES (%s, %s)".replace("%s", "?" if not USE_POSTGRES else "%s"),
+                execute("INSERT INTO categories (name, description) VALUES (?, ?)",
                         (name, description))
                 flash("Category added successfully!", "success")
         return redirect(url_for("admin_categories"))
@@ -1077,13 +1129,13 @@ def admin_categories():
 @app.route("/admin/categories/edit/<int:category_id>", methods=["POST"])
 @admin_required
 def admin_edit_category(category_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     name = request.form.get("name", "").strip()
     description = request.form.get("description", "").strip()
     if len(name) < 2:
         flash("Category name is required.", "danger")
     else:
-        execute("UPDATE categories SET name=%s, description=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("UPDATE categories SET name=?, description=? WHERE id=?",
                 (name, description, category_id))
         flash("Category updated!", "success")
     return redirect(url_for("admin_categories"))
@@ -1092,7 +1144,7 @@ def admin_edit_category(category_id):
 @app.route("/admin/categories/delete/<int:category_id>")
 @admin_required
 def admin_delete_category(category_id):
-    execute("DELETE FROM categories WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"), (category_id,))
+    execute("DELETE FROM categories WHERE id=?", (category_id,))
     flash("Category deleted.", "info")
     return redirect(url_for("admin_categories"))
 
@@ -1103,12 +1155,10 @@ def admin_delete_category(category_id):
 @app.route("/admin/users")
 @admin_required
 def admin_users():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     search = request.args.get("q", "").strip()
     if search:
         users = query(
-            f"SELECT * FROM users WHERE full_name ILIKE {ph} OR email ILIKE {ph} ORDER BY id DESC"
-            if USE_POSTGRES else
             f"SELECT * FROM users WHERE full_name LIKE {ph} OR email LIKE {ph} ORDER BY id DESC",
             (f"%{search}%", f"%{search}%"),
         )
@@ -1120,11 +1170,11 @@ def admin_users():
 @app.route("/admin/users/toggle/<int:user_id>")
 @admin_required
 def admin_toggle_user(user_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     user = query("SELECT * FROM users WHERE id=%s" % ph, (user_id,), one=True)
     if user:
         new_status = "inactive" if user["status"] == "active" else "active"
-        execute("UPDATE users SET status=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("UPDATE users SET status=? WHERE id=?",
                 (new_status, user_id))
         flash(f"User account {new_status}.", "info")
     return redirect(url_for("admin_users"))
@@ -1133,7 +1183,7 @@ def admin_toggle_user(user_id):
 @app.route("/admin/users/delete/<int:user_id>")
 @admin_required
 def admin_delete_user(user_id):
-    execute("DELETE FROM users WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"), (user_id,))
+    execute("DELETE FROM users WHERE id=?", (user_id,))
     flash("User deleted.", "info")
     return redirect(url_for("admin_users"))
 
@@ -1144,13 +1194,13 @@ def admin_delete_user(user_id):
 @app.route("/admin/orders")
 @admin_required
 def admin_orders():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     search = request.args.get("q", "").strip()
     status = request.args.get("status", "").strip()
     where = []
     params = []
     if search:
-        where.append(f"order_number ILIKE {ph}" if USE_POSTGRES else f"order_number LIKE {ph}")
+        where.append(f"order_number LIKE {ph}")
         params.append(f"%{search}%")
     if status:
         where.append(f"status = {ph}")
@@ -1166,7 +1216,7 @@ def admin_orders():
 @app.route("/admin/orders/<int:order_id>")
 @admin_required
 def admin_order_details(order_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     order = query("SELECT * FROM orders WHERE id=%s" % ph, (order_id,), one=True)
     if not order:
         abort(404)
@@ -1177,11 +1227,11 @@ def admin_order_details(order_id):
 @app.route("/admin/orders/<int:order_id>/status", methods=["POST"])
 @admin_required
 def admin_update_order_status(order_id):
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     status = request.form.get("status", "").strip()
     valid = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"]
     if status in valid:
-        execute("UPDATE orders SET status=%s WHERE id=%s".replace("%s", "?" if not USE_POSTGRES else "%s"),
+        execute("UPDATE orders SET status=? WHERE id=?",
                 (status, order_id))
         flash(f"Order status updated to {status}.", "success")
     return redirect(url_for("admin_order_details", order_id=order_id))
@@ -1193,7 +1243,7 @@ def admin_update_order_status(order_id):
 @app.route("/admin/reports")
 @admin_required
 def admin_reports():
-    ph = "?" if not USE_POSTGRES else "%s"
+    ph = "?"
     total_sales = query("SELECT COALESCE(SUM(total),0) AS s FROM orders WHERE status != 'Cancelled'", one=True)["s"]
     total_orders = query("SELECT COUNT(*) AS c FROM orders", one=True)["c"]
     pending = query("SELECT COUNT(*) AS c FROM orders WHERE status='Pending'", one=True)["c"]
@@ -1202,24 +1252,12 @@ def admin_reports():
 
     monthly = query(
         f"""
-        SELECT TO_CHAR(created_at, 'YYYY-MM') AS month, COUNT(*) AS orders, SUM(total) AS sales
-        FROM orders WHERE status != 'Cancelled'
-        GROUP BY month ORDER BY month DESC LIMIT 12
-        """
-        if USE_POSTGRES else
-        f"""
         SELECT strftime('%Y-%m', created_at) AS month, COUNT(*) AS orders, SUM(total) AS sales
         FROM orders WHERE status != 'Cancelled'
         GROUP BY month ORDER BY month DESC LIMIT 12
         """
     )
     daily = query(
-        f"""
-        SELECT TO_CHAR(created_at, 'YYYY-MM-DD') AS day, COUNT(*) AS orders, SUM(total) AS sales
-        FROM orders WHERE status != 'Cancelled'
-        GROUP BY day ORDER BY day DESC LIMIT 14
-        """
-        if USE_POSTGRES else
         f"""
         SELECT date(created_at) AS day, COUNT(*) AS orders, SUM(total) AS sales
         FROM orders WHERE status != 'Cancelled'
@@ -1256,11 +1294,192 @@ def admin_reports():
 
 
 # ---------------------------------------------------------------------------
+# Admin - Site Settings (logo + slideshow video)
+# ---------------------------------------------------------------------------
+ALLOWED_VIDEO_EXTENSIONS = {"mp4", "webm", "ogg", "mov"}
+
+
+def allowed_video(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
+
+
+@app.route("/admin/settings", methods=["GET", "POST"])
+@admin_required
+def admin_settings():
+    ph = "?"
+    settings = query("SELECT * FROM settings ORDER BY id LIMIT 1", one=True)
+    if request.method == "POST":
+        logo = settings["logo"] if settings else None
+        video = settings["slideshow_video"] if settings else None
+        poster = settings["slideshow_poster"] if settings else None
+
+        # Logo upload
+        logo_file = request.files.get("logo")
+        if logo_file and logo_file.filename:
+            if allowed_file(logo_file.filename):
+                fname = secure_filename(logo_file.filename)
+                logo_file.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
+                logo = fname
+            else:
+                flash("Invalid logo format. Use JPG, JPEG, PNG or WEBP.", "danger")
+
+        # Slideshow video upload
+        video_file = request.files.get("slideshow_video")
+        if video_file and video_file.filename:
+            if allowed_video(video_file.filename):
+                fname = secure_filename(video_file.filename)
+                video_file.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
+                video = fname
+            else:
+                flash("Invalid video format. Use MP4, WEBM, OGG or MOV.", "danger")
+
+        # Slideshow poster image (optional)
+        poster_file = request.files.get("slideshow_poster")
+        if poster_file and poster_file.filename:
+            if allowed_file(poster_file.filename):
+                fname = secure_filename(poster_file.filename)
+                poster_file.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
+                poster = fname
+
+        # Text / content fields
+        def g(field, default=""):
+            val = request.form.get(field, "").strip()
+            return val or default
+
+        site_name = g("site_name", "Mini Daraz")
+        phone = g("phone", "0300-1234567")
+        email = g("email", "support@minidaraz.com")
+        address = g("address", "Karachi, Pakistan")
+        facebook = request.form.get("facebook", "").strip()
+        instagram = request.form.get("instagram", "").strip()
+        twitter = request.form.get("twitter", "").strip()
+        youtube = request.form.get("youtube", "").strip()
+        hero_title = g("hero_title", "Mega Sale is Live!")
+        hero_subtitle = g("hero_subtitle", "Up to 70% off on mobiles, electronics, fashion & home.")
+        hero_cta = g("hero_cta", "Shop Now")
+        about_title = g("about_title", "About Mini Daraz")
+        about_text = request.form.get("about_text", "").strip()
+        primary_color = request.form.get("primary_color", "").strip() or "#f57224"
+
+        def checkbox(field):
+            return 1 if request.form.get(field) else 0
+
+        show_flash_sale = checkbox("show_flash_sale")
+        show_categories = checkbox("show_categories")
+        show_popular = checkbox("show_popular")
+        show_new_arrivals = checkbox("show_new_arrivals")
+        show_best_sellers = checkbox("show_best_sellers")
+        show_trending = checkbox("show_trending")
+
+        if settings:
+            execute(
+                """UPDATE settings SET
+                    logo=%s, slideshow_video=%s, slideshow_poster=%s,
+                    site_name=%s, phone=%s, email=%s, address=%s,
+                    facebook=%s, instagram=%s, twitter=%s, youtube=%s,
+                    hero_title=%s, hero_subtitle=%s, hero_cta=%s,
+                    about_title=%s, about_text=%s, primary_color=%s,
+                    show_flash_sale=%s, show_categories=%s, show_popular=%s,
+                    show_new_arrivals=%s, show_best_sellers=%s, show_trending=%s
+                WHERE id=%s""",
+                (logo, video, poster, site_name, phone, email, address,
+                 facebook, instagram, twitter, youtube, hero_title, hero_subtitle,
+                 hero_cta, about_title, about_text, primary_color, show_flash_sale,
+                 show_categories, show_popular, show_new_arrivals, show_best_sellers,
+                 show_trending, settings["id"]),
+            )
+        else:
+            execute(
+                """INSERT INTO settings (
+                    logo, slideshow_video, slideshow_poster, site_name, phone, email, address,
+                    facebook, instagram, twitter, youtube, hero_title, hero_subtitle, hero_cta,
+                    about_title, about_text, primary_color, show_flash_sale, show_categories,
+                    show_popular, show_new_arrivals, show_best_sellers, show_trending
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                .replace("%s", "%s"),
+                (logo, video, poster, site_name, phone, email, address,
+                 facebook, instagram, twitter, youtube, hero_title, hero_subtitle,
+                 hero_cta, about_title, about_text, primary_color, show_flash_sale,
+                 show_categories, show_popular, show_new_arrivals, show_best_sellers,
+                 show_trending),
+            )
+        flash("Site settings saved successfully!", "success")
+        return redirect(url_for("admin_settings"))
+
+    return render_template("admin/settings.html", settings=settings)
+
+
+@app.route("/admin/messages", methods=["GET", "POST"])
+@app.route("/admin/messages/<int:msg_id>", methods=["GET", "POST"])
+@admin_required
+def admin_messages(msg_id=None):
+    """Admin inbox: view customer messages and reply to them."""
+    ph = "?"
+
+    if request.method == "POST" and msg_id is not None:
+        reply = request.form.get("reply", "").strip()
+        if reply:
+            execute(
+                "UPDATE contact_messages SET reply=?, replied_at=CURRENT_TIMESTAMP WHERE id=?",
+                (reply, msg_id),
+            )
+            flash("Reply sent to customer.", "success")
+        return redirect(url_for("admin_messages", msg_id=msg_id))
+
+    # Group messages by user (or by email for guests) to form conversations
+    conversations = query(
+        f"""
+        SELECT
+            COALESCE(user_id, 0) AS conv_key,
+            MIN(id) AS first_id,
+            full_name, email,
+            COUNT(*) AS msg_count,
+            MAX(created_at) AS last_at
+        FROM contact_messages
+        GROUP BY COALESCE(user_id, 0), email
+        ORDER BY last_at DESC
+        """
+    )
+
+    selected = None
+    selected_id = msg_id
+    if msg_id is not None:
+        # Load the full conversation thread for this customer
+        row = query("SELECT * FROM contact_messages WHERE id=%s" % ph, (msg_id,), one=True)
+        if row:
+            selected = query(
+                "SELECT * FROM contact_messages WHERE COALESCE(user_id,0)=%s AND email=%s ORDER BY created_at ASC" % (ph, ph),
+                (row.get("user_id") or 0, row["email"]),
+            )
+    else:
+        # Default to the most recent conversation's thread
+        if conversations:
+            first = conversations[0]
+            selected = query(
+                "SELECT * FROM contact_messages WHERE COALESCE(user_id,0)=%s AND email=%s ORDER BY created_at ASC" % (ph, ph),
+                (first["conv_key"], first["email"]),
+            )
+            selected_id = first["first_id"]
+
+    return render_template(
+        "admin/messages.html",
+        conversations=conversations,
+        selected=selected,
+        selected_id=selected_id,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Error handlers
 # ---------------------------------------------------------------------------
 @app.errorhandler(404)
 def not_found(e):
     return render_template("404.html"), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    logging.error("500 error: %s", traceback.format_exc())
+    return render_template("500.html"), 500
 
 
 # ---------------------------------------------------------------------------
@@ -1270,7 +1489,7 @@ if __name__ == "__main__":
     init_db()
     print("=" * 60)
     print("  MINI DARAZ - E-Commerce Platform")
-    print(f"  Database : {'PostgreSQL' if USE_POSTGRES else 'SQLite (PostgreSQL-ready)'}")
+    print("  Database : SQLite")
     print("  URL      : http://127.0.0.1:5000")
     print("  Admin    : http://127.0.0.1:5000/admin/login")
     print("=" * 60)

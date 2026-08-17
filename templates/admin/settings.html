@@ -1,0 +1,156 @@
+{% extends "admin/base.html" %}
+{% block title %}Site Control - Mini Daraz Admin{% endblock %}
+
+{% macro chk(name, label, checked) %}
+<div class="form-check form-switch mb-2">
+    <input class="form-check-input" type="checkbox" name="{{ name }}" id="{{ name }}" {{ 'checked' if checked }} value="1">
+    <label class="form-check-label" for="{{ name }}">{{ label }}</label>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h4 class="mb-0"><i class="fas fa-sliders-h"></i> Site Control Center</h4>
+    <a href="{{ url_for('index') }}" target="_blank" class="btn btn-outline-primary btn-sm"><i class="fas fa-external-link-alt"></i> View Site</a>
+</div>
+<p class="text-muted">Control every part of your website from here — store info, homepage text, section visibility, social links and branding.</p>
+
+<form method="post" action="{{ url_for('admin_settings') }}" enctype="multipart/form-data">
+    <div class="row g-4">
+        <!-- Store Info -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header"><i class="fas fa-store text-primary"></i> Store Information</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Site Name</label>
+                        <input type="text" name="site_name" class="form-control" value="{{ settings['site_name'] if settings else 'Mini Daraz' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contact Phone</label>
+                        <input type="text" name="phone" class="form-control" value="{{ settings['phone'] if settings else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contact Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ settings['email'] if settings else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <input type="text" name="address" class="form-control" value="{{ settings['address'] if settings else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Primary Brand Color</label>
+                        <input type="color" name="primary_color" class="form-control form-control-color" value="{{ settings['primary_color'] if settings and settings['primary_color'] else '#f57224' }}">
+                        <small class="text-muted">Changes the main theme color across the site.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Branding / Media -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header"><i class="fas fa-image text-primary"></i> Logo & Media</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Site Logo (Image)</label>
+                        <input type="file" name="logo" class="form-control" accept="image/png,image/jpg,image/jpeg,image/webp">
+                        {% if settings and settings['logo'] %}
+                        <div class="mt-2"><span>Current:</span><br>
+                            <img src="{{ url_for('static', filename='images/products/' ~ settings['logo']) }}" alt="Logo" style="max-height:60px; border:1px solid #ddd; border-radius:8px; padding:4px; background:#fff;"></div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Slideshow Video</label>
+                        <input type="file" name="slideshow_video" class="form-control" accept="video/mp4,video/webm,video/ogg,video/quicktime">
+                        {% if settings and settings['slideshow_video'] %}
+                        <div class="mt-2"><video src="{{ url_for('static', filename='images/products/' ~ settings['slideshow_video']) }}" controls muted style="max-height:120px; border-radius:8px;"></video></div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Slideshow Poster (optional)</label>
+                        <input type="file" name="slideshow_poster" class="form-control" accept="image/png,image/jpg,image/jpeg,image/webp">
+                        {% if settings and settings['slideshow_poster'] %}
+                        <div class="mt-2"><img src="{{ url_for('static', filename='images/products/' ~ settings['slideshow_poster']) }}" alt="Poster" style="max-height:80px; border:1px solid #ddd; border-radius:8px; padding:4px; background:#fff;"></div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Homepage Hero -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header"><i class="fas fa-home text-primary"></i> Homepage Hero</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Hero Title</label>
+                        <input type="text" name="hero_title" class="form-control" value="{{ settings['hero_title'] if settings else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hero Subtitle</label>
+                        <input type="text" name="hero_subtitle" class="form-control" value="{{ settings['hero_subtitle'] if settings else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hero Button Text</label>
+                        <input type="text" name="hero_cta" class="form-control" value="{{ settings['hero_cta'] if settings else '' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- About Page -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header"><i class="fas fa-info-circle text-primary"></i> About Page</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">About Title</label>
+                        <input type="text" name="about_title" class="form-control" value="{{ settings['about_title'] if settings else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">About Text</label>
+                        <textarea name="about_text" class="form-control" rows="5">{{ settings['about_text'] if settings and settings['about_text'] else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Social Links -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header"><i class="fas fa-share-alt text-primary"></i> Social Media Links</div>
+                <div class="card-body">
+                    <div class="mb-3"><label class="form-label"><i class="fab fa-facebook"></i> Facebook</label>
+                        <input type="url" name="facebook" class="form-control" value="{{ settings['facebook'] if settings else '' }}"></div>
+                    <div class="mb-3"><label class="form-label"><i class="fab fa-instagram"></i> Instagram</label>
+                        <input type="url" name="instagram" class="form-control" value="{{ settings['instagram'] if settings else '' }}"></div>
+                    <div class="mb-3"><label class="form-label"><i class="fab fa-twitter"></i> Twitter / X</label>
+                        <input type="url" name="twitter" class="form-control" value="{{ settings['twitter'] if settings else '' }}"></div>
+                    <div class="mb-3"><label class="form-label"><i class="fab fa-youtube"></i> YouTube</label>
+                        <input type="url" name="youtube" class="form-control" value="{{ settings['youtube'] if settings else '' }}"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Homepage Sections -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header"><i class="fas fa-th-large text-primary"></i> Homepage Sections (show / hide)</div>
+                <div class="card-body">
+                    {{ chk('show_flash_sale', 'Flash Sale', settings and settings['show_flash_sale']) }}
+                    {{ chk('show_categories', 'Shop by Category', settings and settings['show_categories']) }}
+                    {{ chk('show_popular', 'Popular Products', settings and settings['show_popular']) }}
+                    {{ chk('show_new_arrivals', 'New Arrivals', settings and settings['show_new_arrivals']) }}
+                    {{ chk('show_best_sellers', 'Best Sellers', settings and settings['show_best_sellers']) }}
+                    {{ chk('show_trending', 'Trending Now', settings and settings['show_trending']) }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save All Changes</button>
+    </div>
+</form>
+{% endblock %}

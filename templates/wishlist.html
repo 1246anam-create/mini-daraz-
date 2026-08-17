@@ -16,7 +16,7 @@
                         <a href="{{ url_for('product_details', product_id=it['id']) }}" class="product-name">{{ it['name'] }}</a>
                         <div class="product-price"><span class="current">Rs. {{ "%.0f"|format(it['price'] - (it['price']*it['discount']/100) if it['discount'] else it['price']) }}</span></div>
                         <div class="product-actions">
-                            <button class="btn btn-add-cart" data-product="{{ it['id'] }}"><i class="fas fa-cart-plus"></i> Move to Cart</button>
+                            <a href="{{ url_for('move_to_cart', wish_id=it['wish_id']) }}" class="btn btn-add-cart"><i class="fas fa-cart-plus"></i> Move to Cart</a>
                             <button class="btn btn-danger btn-sm remove-wish" data-id="{{ it['wish_id'] }}"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>

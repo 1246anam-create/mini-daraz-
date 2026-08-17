@@ -1,12 +1,10 @@
 """
 Mini Daraz - Database Module
-============================
-Handles PostgreSQL connection (with automatic SQLite fallback for local
-development when PostgreSQL is not installed).
+===========================
+Handles SQLite database connection and schema.
 
-The schema is PostgreSQL-compatible. When a DATABASE_URL environment variable
-is set, the app connects to PostgreSQL. Otherwise it falls back to SQLite so
-the project runs out of the box.
+The project uses SQLite (a file-based database) so it runs out of the box
+with no external database server required.
 """
 
 import os
@@ -16,7 +14,9 @@ from contextlib import contextmanager
 # ---------------------------------------------------------------------------
 # Load .env file (minimal parser; no external dependency required)
 # ---------------------------------------------------------------------------
-def _load_env(path=".env"):
+def _load_env(path=None):
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     try:
         with open(path, "r", encoding="utf-8") as f:
             for line in f:
@@ -34,37 +34,19 @@ _load_env()
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/mini_daraz",
+DB_PATH = os.environ.get(
+    "DATABASE_PATH",
+    os.path.join(os.path.dirname(__file__), "mini_daraz.db"),
 )
 
-USE_POSTGRES = DATABASE_URL.startswith("postgresql")
+PLACEHOLDER = "?"
 
-if USE_POSTGRES:
-    try:
-        import psycopg2
-        import psycopg2.extras
-        # Verify we can actually reach the server; otherwise fall back to SQLite.
-        _test = psycopg2.connect(DATABASE_URL, connect_timeout=3)
-        _test.close()
 
-        def _connect():
-            return psycopg2.connect(DATABASE_URL)
-
-        PLACEHOLDER = "%s"
-    except Exception:
-        # PostgreSQL unavailable -> use local SQLite so the app still runs.
-        USE_POSTGRES = False
-
-if not USE_POSTGRES:
-    def _connect():
-        conn = sqlite3.connect(os.path.join(os.path.dirname(__file__), "mini_daraz.db"))
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        return conn
-
-    PLACEHOLDER = "?"
+def _connect():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
 
 
 @contextmanager
@@ -107,7 +89,7 @@ def execute(sql, params=None):
 # ---------------------------------------------------------------------------
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     full_name   VARCHAR(120) NOT NULL,
     email       VARCHAR(120) NOT NULL UNIQUE,
     phone       VARCHAR(30),
@@ -120,7 +102,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS admins (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     full_name   VARCHAR(120) NOT NULL,
     email       VARCHAR(120) NOT NULL UNIQUE,
     password    VARCHAR(255) NOT NULL,
@@ -128,7 +110,7 @@ CREATE TABLE IF NOT EXISTS admins (
 );
 
 CREATE TABLE IF NOT EXISTS categories (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        VARCHAR(120) NOT NULL UNIQUE,
     description TEXT,
     image       VARCHAR(255),
@@ -136,7 +118,7 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE TABLE IF NOT EXISTS products (
-    id              SERIAL PRIMARY KEY,
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id     INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     name            VARCHAR(200) NOT NULL,
     brand           VARCHAR(120),
@@ -156,7 +138,7 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 CREATE TABLE IF NOT EXISTS cart (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     quantity    INTEGER DEFAULT 1,
@@ -165,7 +147,7 @@ CREATE TABLE IF NOT EXISTS cart (
 );
 
 CREATE TABLE IF NOT EXISTS wishlist (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -173,7 +155,7 @@ CREATE TABLE IF NOT EXISTS wishlist (
 );
 
 CREATE TABLE IF NOT EXISTS orders (
-    id              SERIAL PRIMARY KEY,
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
     order_number    VARCHAR(30) NOT NULL UNIQUE,
     user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     customer_name   VARCHAR(120) NOT NULL,
@@ -192,7 +174,7 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 CREATE TABLE IF NOT EXISTS order_items (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id    INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     product_name VARCHAR(200) NOT NULL,
@@ -203,7 +185,7 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 
 CREATE TABLE IF NOT EXISTS reviews (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     rating      INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
@@ -213,7 +195,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 
 CREATE TABLE IF NOT EXISTS contact_messages (
-    id          SERIAL PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     full_name   VARCHAR(120) NOT NULL,
     email       VARCHAR(120) NOT NULL,
     phone       VARCHAR(30),
@@ -228,12 +210,8 @@ def init_db():
     """Create all tables."""
     with get_db() as conn:
         cur = conn.cursor()
-        if USE_POSTGRES:
-            cur.execute(SCHEMA)
-        else:
-            sqlite_schema = SCHEMA.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
-            for statement in sqlite_schema.split(";"):
-                statement = statement.strip()
-                if statement:
-                    cur.execute(statement)
+        for statement in SCHEMA.split(";"):
+            statement = statement.strip()
+            if statement:
+                cur.execute(statement)
         conn.commit()

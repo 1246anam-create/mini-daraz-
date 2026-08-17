@@ -17,9 +17,9 @@
             </div>
             <div class="col-md-6">
                 <h5>Our Information</h5>
-                <p><i class="fas fa-map-marker-alt"></i> Karachi, Pakistan</p>
-                <p><i class="fas fa-phone"></i> 0300-1234567</p>
-                <p><i class="fas fa-envelope"></i> support@minidaraz.com</p>
+                <p><i class="fas fa-map-marker-alt"></i> {{ site_settings['address'] if site_settings and site_settings['address'] else 'Karachi, Pakistan' }}</p>
+                <p><i class="fas fa-phone"></i> {{ site_settings['phone'] if site_settings and site_settings['phone'] else '0300-1234567' }}</p>
+                <p><i class="fas fa-envelope"></i> {{ site_settings['email'] if site_settings and site_settings['email'] else 'support@minidaraz.com' }}</p>
                 <p>We typically respond within 24 hours.</p>
             </div>
         </div>

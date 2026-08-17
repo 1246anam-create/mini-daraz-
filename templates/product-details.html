@@ -30,9 +30,22 @@
                     <input type="number" id="qty" value="1" min="1" max="{{ product['stock'] }}" class="form-control d-inline-block" style="width:70px">
                     <button id="qty-plus" class="btn">+</button>
                 </div>
-                <div class="d-flex gap-2 mb-3">
-                    <button class="btn btn-primary btn-lg" id="add-to-cart-btn" data-product="{{ product['id'] }}"><i class="fas fa-cart-plus"></i> Add to Cart</button>
-                    <button class="btn btn-outline-danger btn-lg" id="add-to-wish-btn" data-product="{{ product['id'] }}"><i class="far fa-heart"></i></button>
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <form method="post" action="{{ url_for('add_to_cart') }}" class="d-inline">
+                        <input type="hidden" name="product_id" value="{{ product['id'] }}">
+                        <input type="hidden" name="quantity" id="cart-qty" value="1">
+                        <button type="submit" class="btn btn-primary btn-lg" id="add-to-cart-btn"><i class="fas fa-cart-plus"></i> Add to Cart</button>
+                    </form>
+                    <form method="post" action="{{ url_for('add_to_cart') }}" class="d-inline">
+                        <input type="hidden" name="product_id" value="{{ product['id'] }}">
+                        <input type="hidden" name="quantity" id="buy-qty" value="1">
+                        <input type="hidden" name="buy_now" value="1">
+                        <button type="submit" class="btn btn-success btn-lg" id="buy-now-btn"><i class="fas fa-bolt"></i> Buy Now</button>
+                    </form>
+                    <form method="post" action="{{ url_for('add_to_wishlist') }}" class="d-inline add-to-wishlist-form">
+                        <input type="hidden" name="product_id" value="{{ product['id'] }}">
+                        <button type="submit" class="btn btn-outline-danger btn-lg" id="add-to-wish-btn" title="Add to Favorites"><i class="far fa-heart"></i> Favorite</button>
+                    </form>
                 </div>
                 {% endif %}
             </div>
@@ -96,7 +109,13 @@
 {% endblock %}
 {% block scripts %}
 <script>
-document.getElementById('qty-minus')?.addEventListener('click', () => { const q=document.getElementById('qty'); q.value=Math.max(1, parseInt(q.value)-1); });
-document.getElementById('qty-plus')?.addEventListener('click', () => { const q=document.getElementById('qty'); q.value=Math.min(parseInt(q.max)||99, parseInt(q.value)+1); });
+const qtyEl = document.getElementById('qty');
+function syncQty(){ const v = qtyEl ? qtyEl.value : 1; const c=document.getElementById('cart-qty'); const b=document.getElementById('buy-qty'); if(c) c.value=v; if(b) b.value=v; }
+if (qtyEl) {
+  document.getElementById('qty-minus')?.addEventListener('click', () => { qtyEl.value=Math.max(1, parseInt(qtyEl.value)-1); syncQty(); });
+  document.getElementById('qty-plus')?.addEventListener('click', () => { qtyEl.value=Math.min(parseInt(qtyEl.max)||99, parseInt(qtyEl.value)+1); syncQty(); });
+  qtyEl.addEventListener('change', syncQty);
+  syncQty();
+}
 </script>
 {% endblock %}

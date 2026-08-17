@@ -8,20 +8,27 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% if site_settings and site_settings['primary_color'] %}
+    <style>:root{--primary:{{ site_settings['primary_color'] }};}</style>
+    {% endif %}
 </head>
 <body>
     <!-- Header -->
     <header class="site-header">
         <div class="top-bar">
             <div class="container d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-phone-alt"></i> Hotline: 0300-1234567</span>
+                <span><i class="fas fa-phone-alt"></i> Hotline: {{ site_settings['phone'] if site_settings and site_settings['phone'] else '0300-1234567' }}</span>
                 <span>Free delivery on orders over Rs. 1000</span>
             </div>
         </div>
         <nav class="navbar main-navbar">
             <div class="container">
                 <a class="navbar-brand" href="{{ url_for('index') }}">
-                    <span class="brand-mini">Mini</span><span class="brand-daraz">Daraz</span>
+                    {% if site_settings and site_settings['logo'] %}
+                        <img src="{{ url_for('static', filename='images/products/' ~ site_settings['logo']) }}" alt="{{ site_settings['site_name'] if site_settings and site_settings['site_name'] else 'Mini Daraz' }}" class="site-logo">
+                    {% else %}
+                        <span class="brand-mini">{{ (site_settings['site_name'].split(' ')[0]) if site_settings and site_settings['site_name'] else 'Mini' }}</span><span class="brand-daraz">{{ (site_settings['site_name'].split(' ')[1:] | join(' ')) if site_settings and site_settings['site_name'] else 'Daraz' }}</span>
+                    {% endif %}
                 </a>
                 <form class="search-form d-none d-md-flex" action="{{ url_for('products') }}" method="get">
                     <input type="text" name="q" class="form-control" placeholder="Search products, brands and more..." value="{{ request.args.get('q','') }}">
@@ -35,11 +42,15 @@
                         <a href="{{ url_for('cart') }}" class="nav-icon" title="Cart">
                             <i class="fas fa-shopping-cart"></i><span class="badge" id="cart-badge">{{ cart_count }}</span>
                         </a>
+                        <a href="{{ url_for('messages') }}" class="nav-icon" title="Messages">
+                            <i class="far fa-comment-dots"></i>
+                        </a>
                         <div class="dropdown d-inline">
                             <a href="#" class="nav-icon dropdown-toggle" data-bs-toggle="dropdown"><i class="far fa-user"></i></a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user-cog"></i> My Account</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('orders') }}"><i class="fas fa-box"></i> My Orders</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('messages') }}"><i class="far fa-comment-dots"></i> My Messages</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                             </ul>
@@ -54,11 +65,16 @@
             </div>
         </nav>
         <div class="category-strip">
-            <div class="container d-flex flex-wrap gap-2">
-                <a href="{{ url_for('products') }}" class="cat-pill">All</a>
-                {% for c in query("SELECT * FROM categories LIMIT 10") %}
+            <div class="container d-flex flex-wrap gap-2 align-items-center">
+                <a href="{{ url_for('index') }}" class="cat-pill"><i class="fas fa-home"></i> Home</a>
+                <a href="{{ url_for('products') }}" class="cat-pill">All Products</a>
+                <a href="{{ url_for('categories_page') }}" class="cat-pill">Categories</a>
+                {% for c in query("SELECT * FROM categories LIMIT 8") %}
                     <a href="{{ url_for('category_products', category_id=c['id']) }}" class="cat-pill">{{ c['name'] }}</a>
                 {% endfor %}
+                <a href="{{ url_for('about') }}" class="cat-pill">About Us</a>
+                <a href="{{ url_for('contact') }}" class="cat-pill">Contact</a>
+                <a href="{{ url_for('track_order') }}" class="cat-pill">Track Order</a>
             </div>
         </div>
     </header>
@@ -87,8 +103,14 @@
         <div class="container">
             <div class="row">
                 <div class="col-md-3">
-                    <h5>Mini Daraz</h5>
+                    <h5>{{ site_settings['site_name'] if site_settings and site_settings['site_name'] else 'Mini Daraz' }}</h5>
                     <p>Your trusted online marketplace for quality products at the best prices.</p>
+                    <div class="footer-social mt-2">
+                        {% if site_settings and site_settings['facebook'] %}<a href="{{ site_settings['facebook'] }}" target="_blank"><i class="fab fa-facebook"></i></a>{% endif %}
+                        {% if site_settings and site_settings['instagram'] %}<a href="{{ site_settings['instagram'] }}" target="_blank"><i class="fab fa-instagram"></i></a>{% endif %}
+                        {% if site_settings and site_settings['twitter'] %}<a href="{{ site_settings['twitter'] }}" target="_blank"><i class="fab fa-twitter"></i></a>{% endif %}
+                        {% if site_settings and site_settings['youtube'] %}<a href="{{ site_settings['youtube'] }}" target="_blank"><i class="fab fa-youtube"></i></a>{% endif %}
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <h6>Quick Links</h6>
@@ -112,9 +134,9 @@
                 </div>
                 <div class="col-md-3">
                     <h6>Contact</h6>
-                    <p><i class="fas fa-map-marker-alt"></i> Karachi, Pakistan</p>
-                    <p><i class="fas fa-phone"></i> 0300-1234567</p>
-                    <p><i class="fas fa-envelope"></i> support@minidaraz.com</p>
+                    <p><i class="fas fa-map-marker-alt"></i> {{ site_settings['address'] if site_settings and site_settings['address'] else 'Karachi, Pakistan' }}</p>
+                    <p><i class="fas fa-phone"></i> {{ site_settings['phone'] if site_settings and site_settings['phone'] else '0300-1234567' }}</p>
+                    <p><i class="fas fa-envelope"></i> {{ site_settings['email'] if site_settings and site_settings['email'] else 'support@minidaraz.com' }}</p>
                 </div>
             </div>
             <hr>

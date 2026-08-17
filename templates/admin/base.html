@@ -17,7 +17,9 @@
         <a href="{{ url_for('admin_categories') }}" class="{{ 'active' if 'categor' in request.endpoint }}"><i class="fas fa-tags"></i> Categories</a>
         <a href="{{ url_for('admin_orders') }}" class="{{ 'active' if 'order' in request.endpoint }}"><i class="fas fa-shopping-bag"></i> Orders</a>
         <a href="{{ url_for('admin_users') }}" class="{{ 'active' if 'user' in request.endpoint }}"><i class="fas fa-users"></i> Users</a>
+        <a href="{{ url_for('admin_messages') }}" class="{{ 'active' if 'messages' in request.endpoint }}"><i class="fas fa-comments"></i> Messages</a>
         <a href="{{ url_for('admin_reports') }}" class="{{ 'active' if request.endpoint=='admin_reports' }}"><i class="fas fa-chart-bar"></i> Reports</a>
+        <a href="{{ url_for('admin_settings') }}" class="{{ 'active' if request.endpoint=='admin_settings' }}"><i class="fas fa-cog"></i> Site Settings</a>
         <hr style="border-color:#374151">
         <a href="{{ url_for('index') }}"><i class="fas fa-store"></i> View Site</a>
         <a href="{{ url_for('admin_logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>

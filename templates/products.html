@@ -77,7 +77,19 @@
                                     {% if p['discount'] and p['discount'] > 0 %}<span class="old">Rs. {{ "%.0f"|format(p['price']) }}</span>{% endif %}
                                 </div>
                                 <div class="product-actions">
-                                    <button class="btn btn-add-cart" data-product="{{ p['id'] }}"><i class="fas fa-cart-plus"></i> Add</button>
+                                    <form method="post" action="{{ url_for('add_to_cart') }}" class="d-inline">
+                                        <input type="hidden" name="product_id" value="{{ p['id'] }}">
+                                        <button type="submit" class="btn btn-add-cart"><i class="fas fa-cart-plus"></i> Add</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('add_to_cart') }}" class="d-inline">
+                                        <input type="hidden" name="product_id" value="{{ p['id'] }}">
+                                        <input type="hidden" name="buy_now" value="1">
+                                        <button type="submit" class="btn btn-buy-now" title="Buy Now"><i class="fas fa-bolt"></i></button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('add_to_wishlist') }}" class="d-inline add-to-wishlist-form">
+                                        <input type="hidden" name="product_id" value="{{ p['id'] }}">
+                                        <button type="submit" class="btn btn-add-wish" title="Add to Favorites"><i class="far fa-heart"></i></button>
+                                    </form>
                                 </div>
                             </div>
                         </div>

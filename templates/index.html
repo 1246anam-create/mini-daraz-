@@ -24,8 +24,19 @@
                 <span>({{ p['rating'] or 0 }})</span>
             </div>
             <div class="product-actions">
-                <button class="btn btn-add-cart" data-product="{{ p['id'] }}"><i class="fas fa-cart-plus"></i> Add</button>
-                <button class="btn btn-add-wish" data-product="{{ p['id'] }}"><i class="far fa-heart"></i></button>
+                <form method="post" action="{{ url_for('add_to_cart') }}" class="d-inline">
+                    <input type="hidden" name="product_id" value="{{ p['id'] }}">
+                    <button type="submit" class="btn btn-add-cart"><i class="fas fa-cart-plus"></i> Add</button>
+                </form>
+                <form method="post" action="{{ url_for('add_to_cart') }}" class="d-inline">
+                    <input type="hidden" name="product_id" value="{{ p['id'] }}">
+                    <input type="hidden" name="buy_now" value="1">
+                    <button type="submit" class="btn btn-buy-now" title="Buy Now"><i class="fas fa-bolt"></i></button>
+                </form>
+                <form method="post" action="{{ url_for('add_to_wishlist') }}" class="d-inline add-to-wishlist-form">
+                    <input type="hidden" name="product_id" value="{{ p['id'] }}">
+                    <button type="submit" class="btn btn-add-wish" title="Add to Favorites"><i class="far fa-heart"></i></button>
+                </form>
             </div>
         </div>
     </div>
@@ -36,10 +47,15 @@
 <!-- Hero -->
 <section class="hero">
     <div class="container">
-        <div class="hero-content">
-            <h1>Mega Sale is Live!</h1>
-            <p>Up to 70% off on mobiles, electronics, fashion & home.</p>
-            <a href="{{ url_for('products') }}" class="btn btn-shop">Shop Now</a>
+        <div class="row align-items-center">
+            <div class="col-lg-6 hero-content">
+                <h1>{{ site_settings['hero_title'] if site_settings and site_settings['hero_title'] else 'Mega Sale is Live!' }}</h1>
+                <p>{{ site_settings['hero_subtitle'] if site_settings and site_settings['hero_subtitle'] else 'Up to 70% off on mobiles, electronics, fashion & home.' }}</p>
+                <a href="{{ url_for('products') }}" class="btn btn-shop">{{ site_settings['hero_cta'] if site_settings and site_settings['hero_cta'] else 'Shop Now' }}</a>
+            </div>
+            <div class="col-lg-6 text-center">
+                <img src="{{ url_for('static', filename='images/products/shopping.webp') }}" alt="Mega Sale" class="img-fluid hero-img">
+            </div>
         </div>
     </div>
 </section>
@@ -53,7 +69,23 @@
     </div>
 </section>
 
+<!-- Slideshow Video -->
+{% if site_settings and site_settings['slideshow_video'] %}
+<section class="home-slideshow py-3">
+    <div class="container">
+        <div class="slideshow-wrap rounded shadow-sm overflow-hidden">
+            <video class="w-100" autoplay muted loop playsinline
+                   {% if site_settings['slideshow_poster'] %}poster="{{ url_for('static', filename='images/products/' ~ site_settings['slideshow_poster']) }}"{% endif %}>
+                <source src="{{ url_for('static', filename='images/products/' ~ site_settings['slideshow_video']) }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+    </div>
+</section>
+{% endif %}
+
 <!-- Flash Sale -->
+{% if not site_settings or site_settings['show_flash_sale'] %}
 <section class="flash-sale py-4">
     <div class="container">
         <div class="section-head d-flex justify-content-between align-items-center">
@@ -61,12 +93,14 @@
             <div class="flash-timer" id="flash-timer">00:00:00</div>
         </div>
         <div class="row">
-            {% for p in flash_products %}{{ product_card(p) }}{% endfor %}
+            {% for p in flash_sale %}{{ product_card(p) }}{% endfor %}
         </div>
     </div>
 </section>
+{% endif %}
 
 <!-- Categories -->
+{% if not site_settings or site_settings['show_categories'] %}
 <section class="py-4">
     <div class="container">
         <div class="section-head"><h3>Shop by Category</h3></div>
@@ -81,36 +115,45 @@
         </div>
     </div>
 </section>
+{% endif %}
 
 <!-- Popular -->
+{% if not site_settings or site_settings['show_popular'] %}
 <section class="py-4 bg-light">
     <div class="container">
         <div class="section-head"><h3>Popular Products</h3></div>
-        <div class="row">{% for p in popular_products %}{{ product_card(p) }}{% endfor %}</div>
+        <div class="row">{% for p in popular %}{{ product_card(p) }}{% endfor %}</div>
     </div>
 </section>
+{% endif %}
 
 <!-- New Arrivals -->
+{% if not site_settings or site_settings['show_new_arrivals'] %}
 <section class="py-4">
     <div class="container">
         <div class="section-head"><h3>New Arrivals</h3></div>
-        <div class="row">{% for p in new_products %}{{ product_card(p) }}{% endfor %}</div>
+        <div class="row">{% for p in new_arrivals %}{{ product_card(p) }}{% endfor %}</div>
     </div>
 </section>
+{% endif %}
 
 <!-- Best Sellers -->
+{% if not site_settings or site_settings['show_best_sellers'] %}
 <section class="py-4 bg-light">
     <div class="container">
         <div class="section-head"><h3>Best Sellers</h3></div>
-        <div class="row">{% for p in best_products %}{{ product_card(p) }}{% endfor %}</div>
+        <div class="row">{% for p in best_sellers %}{{ product_card(p) }}{% endfor %}</div>
     </div>
 </section>
+{% endif %}
 
 <!-- Trending -->
+{% if not site_settings or site_settings['show_trending'] %}
 <section class="py-4">
     <div class="container">
         <div class="section-head"><h3>Trending Now</h3></div>
-        <div class="row">{% for p in trending_products %}{{ product_card(p) }}{% endfor %}</div>
+        <div class="row">{% for p in trending %}{{ product_card(p) }}{% endfor %}</div>
     </div>
 </section>
+{% endif %}
 {% endblock %}

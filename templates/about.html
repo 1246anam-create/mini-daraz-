@@ -3,9 +3,13 @@
 {% block content %}
 <section class="py-5">
     <div class="container">
-        <h2 class="mb-4">About Mini Daraz</h2>
+        <h2 class="mb-4">{{ site_settings['about_title'] if site_settings and site_settings['about_title'] else 'About Mini Daraz' }}</h2>
+        {% if site_settings and site_settings['about_text'] %}
+            <p>{{ site_settings['about_text'] }}</p>
+        {% else %}
         <p>Mini Daraz is a modern e-commerce platform built to bring quality products to your doorstep at the best prices. We offer a wide range of categories including mobiles, electronics, fashion, home appliances and more.</p>
         <p>Our mission is to make online shopping simple, secure and enjoyable for everyone. With features like secure checkout, order tracking, wishlists and a responsive customer support team, we strive to deliver the best shopping experience.</p>
+        {% endif %}
         <div class="row mt-4">
             <div class="col-md-4 text-center mb-3"><i class="fas fa-shipping-fast fa-2x text-primary"></i><h5 class="mt-2">Fast Delivery</h5><p>Quick and reliable shipping across the country.</p></div>
             <div class="col-md-4 text-center mb-3"><i class="fas fa-shield-alt fa-2x text-primary"></i><h5 class="mt-2">Secure Payments</h5><p>Your data and payments are always protected.</p></div>

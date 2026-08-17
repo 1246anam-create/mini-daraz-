@@ -1,0 +1,95 @@
+{% extends "admin/base.html" %}
+{% block title %}Messages - Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h4 class="mb-0"><i class="fas fa-inbox"></i> Customer Messages</h4>
+    <span class="badge bg-primary">{{ conversations|length }} conversation(s)</span>
+</div>
+
+<div class="card shadow-sm">
+    <div class="row g-0">
+        <!-- Conversation list -->
+        <div class="col-md-4 border-end">
+            <div class="list-group list-group-flush" style="max-height:70vh; overflow:auto;">
+                {% if not conversations %}
+                    <div class="p-4 text-center text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                        <p class="mb-0">No messages yet.</p>
+                    </div>
+                {% endif %}
+                {% for conv in conversations %}
+                    {% set first_id = conv['first_id'] %}
+                    <a href="{{ url_for('admin_messages', msg_id=first_id) }}"
+                       class="list-group-item list-group-item-action {{ 'active' if selected and selected[0]['email']==conv['email'] }}">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ conv['full_name'] or 'Guest' }}</strong>
+                            <small class="text-muted">
+                                {{ format_datetime(conv['last_at'], '%d %b') }}
+                            </small>
+                        </div>
+                        <div class="text-muted small text-truncate">{{ conv['email'] }}</div>
+                        <span class="badge bg-secondary">{{ conv['msg_count'] }} msg</span>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Selected conversation -->
+        <div class="col-md-8">
+            {% if selected %}
+                <div class="p-3 border-bottom bg-light">
+                    <strong>{{ selected[0]['full_name'] or 'Guest' }}</strong>
+                    <span class="text-muted"><{{ selected[0]['email'] }}></span>
+                    {% if selected[0]['phone'] %}<span class="text-muted ms-2"><i class="fas fa-phone"></i> {{ selected[0]['phone'] }}</span>{% endif %}
+                </div>
+
+                <div class="chat-box" style="max-height:50vh; overflow:auto; padding:1rem;">
+                    {% for m in selected %}
+                        <div class="msg-row msg-user">
+                            <div class="msg-bubble">
+                                <div class="msg-text">{{ m['message'] }}</div>
+                                <div class="msg-time">
+                                    <i class="far fa-clock"></i>
+                                    {{ format_datetime(m['created_at']) }}
+                                </div>
+                            </div>
+                        </div>
+                        {% if m['reply'] %}
+                            <div class="msg-row msg-admin">
+                                <div class="msg-avatar"><i class="fas fa-headset"></i></div>
+                                <div class="msg-bubble">
+                                    <div class="msg-sender">Support Team</div>
+                                    <div class="msg-text">{{ m['reply'] }}</div>
+                                    <div class="msg-time">
+                                        <i class="far fa-clock"></i>
+                                        {{ format_datetime(m['replied_at']) }}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <!-- Reply form -->
+                <div class="p-3 border-top">
+                    <form method="post" action="{{ url_for('admin_messages', msg_id=selected_id) }}">
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Reply to customer</label>
+                            <textarea name="reply" class="form-control" rows="3" placeholder="Type your reply..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-reply"></i> Send Reply
+                        </button>
+                    </form>
+                </div>
+            {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="fas fa-comments fa-2x mb-2"></i>
+                    <p class="mb-0">Select a conversation to view messages.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

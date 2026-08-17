@@ -12,10 +12,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from db import query, execute, init_db, USE_POSTGRES
+from db import query, execute, init_db
 from werkzeug.security import generate_password_hash
 
-PH = "?" if not USE_POSTGRES else "%s"
+PH = "?"
 
 
 def seed():
