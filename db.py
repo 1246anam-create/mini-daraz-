@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS wishlist (
 CREATE TABLE IF NOT EXISTS orders (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     order_number    VARCHAR(30) NOT NULL UNIQUE,
-    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE,
     customer_name   VARCHAR(120) NOT NULL,
     phone           VARCHAR(30) NOT NULL,
     email           VARCHAR(120) NOT NULL,

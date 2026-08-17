@@ -119,7 +119,8 @@ def cart_count():
             (session["user_id"],), one=True,
         )
         return row["c"] or 0
-    return 0
+    # Guest cart is stored in the session
+    return sum(it.get("quantity", 0) for it in session.get("guest_cart", []))
 
 
 def wishlist_count():
@@ -165,6 +166,77 @@ def cart_summary(user_id):
         "delivery": round(delivery, 2),
         "total": round(total, 2),
     }
+
+
+def get_guest_cart_items():
+    """Return guest cart items (dicts) with product details joined in."""
+    items = session.get("guest_cart", [])
+    if not items:
+        return []
+    ids = [it["product_id"] for it in items]
+    placeholders = ",".join("?" for _ in ids)
+    products = query(
+        f"SELECT * FROM products WHERE id IN ({placeholders})", ids
+    )
+    by_id = {p["id"]: p for p in products}
+    result = []
+    for it in items:
+        p = by_id.get(it["product_id"])
+        if not p:
+            continue
+        entry = dict(p)
+        entry["cart_id"] = "g" + str(it["product_id"])
+        entry["quantity"] = it["quantity"]
+        entry["line_total"] = float(p["price"]) * it["quantity"]
+        result.append(entry)
+    return result
+
+
+def guest_cart_summary():
+    items = get_guest_cart_items()
+    subtotal = 0.0
+    discount_total = 0.0
+    for it in items:
+        orig = float(it["price"]) * it["quantity"]
+        disc = float(it["discount"] or 0)
+        final = orig - (orig * disc / 100)
+        subtotal += final
+        discount_total += orig * disc / 100
+    delivery = 0.0 if subtotal >= FREE_DELIVERY_ABOVE else DELIVERY_CHARGE
+    total = subtotal + delivery
+    return {
+        "items": items,
+        "subtotal": round(subtotal, 2),
+        "discount": round(discount_total, 2),
+        "delivery": round(delivery, 2),
+        "total": round(total, 2),
+    }
+
+
+def merge_guest_cart(user_id):
+    """Move session guest cart into the DB cart for the logged-in user."""
+    guest = session.get("guest_cart", [])
+    if not guest:
+        return
+    for it in guest:
+        pid = it["product_id"]
+        qty = it["quantity"]
+        product = query("SELECT * FROM products WHERE id = ?", (pid,), one=True)
+        if not product:
+            continue
+        existing = query(
+            "SELECT * FROM cart WHERE user_id=? AND product_id=?",
+            (user_id, pid), one=True,
+        )
+        if existing:
+            new_qty = min(existing["quantity"] + qty, product["stock"] if product["stock"] > 0 else 99)
+            execute("UPDATE cart SET quantity=? WHERE id=?", (new_qty, existing["id"]))
+        else:
+            execute(
+                "INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)",
+                (user_id, pid, qty),
+            )
+    session.pop("guest_cart", None)
 
 
 def get_product(product_id):
@@ -492,9 +564,14 @@ def login():
             flash("Your account has been deactivated. Contact support.", "danger")
             return render_template("login.html", form=request.form)
 
+        # Capture guest cart BEFORE clearing the session
+        guest_cart = session.get("guest_cart", [])
         session.clear()
         session["user_id"] = user["id"]
         session["user_name"] = user["full_name"]
+        if guest_cart:
+            session["guest_cart"] = guest_cart
+            merge_guest_cart(user["id"])
         flash(f"Welcome back, {user['full_name']}!", "success")
         nxt = request.args.get("next")
         return redirect(nxt or url_for("index"))
@@ -559,14 +636,15 @@ def change_password():
 # Cart
 # ---------------------------------------------------------------------------
 @app.route("/cart")
-@login_required
 def cart():
-    summary = cart_summary(session["user_id"])
-    return render_template("cart.html", **summary)
+    if "user_id" in session:
+        summary = cart_summary(session["user_id"])
+    else:
+        summary = guest_cart_summary()
+    return render_template("cart.html", **summary, guest=("user_id" not in session))
 
 
 @app.route("/cart/add", methods=["POST"])
-@login_required
 def add_to_cart():
     ph = "?"
     product_id = request.form.get("product_id")
@@ -576,15 +654,28 @@ def add_to_cart():
         flash("Product not found.", "danger")
         return redirect(url_for("products"))
 
-    existing = query("SELECT * FROM cart WHERE user_id=? AND product_id=?",
-                     (session["user_id"], product_id), one=True)
-    if existing:
-        new_qty = min(existing["quantity"] + quantity, product["stock"] if product["stock"] > 0 else 99)
-        execute("UPDATE cart SET quantity=? WHERE id=?",
-                (new_qty, existing["id"]))
+    if "user_id" in session:
+        existing = query("SELECT * FROM cart WHERE user_id=? AND product_id=?",
+                         (session["user_id"], product_id), one=True)
+        if existing:
+            new_qty = min(existing["quantity"] + quantity, product["stock"] if product["stock"] > 0 else 99)
+            execute("UPDATE cart SET quantity=? WHERE id=?",
+                    (new_qty, existing["id"]))
+        else:
+            execute("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)",
+                    (session["user_id"], product_id, quantity))
     else:
-        execute("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)",
-                (session["user_id"], product_id, quantity))
+        # Guest cart stored in session
+        guest = session.get("guest_cart", [])
+        found = False
+        for it in guest:
+            if it["product_id"] == int(product_id):
+                it["quantity"] = min(it["quantity"] + quantity, product["stock"] if product["stock"] > 0 else 99)
+                found = True
+                break
+        if not found:
+            guest.append({"product_id": int(product_id), "quantity": quantity})
+        session["guest_cart"] = guest
     flash("Product added to cart!", "success")
     if request.form.get("buy_now") or request.args.get("buy_now"):
         return redirect(url_for("checkout"))
@@ -592,24 +683,42 @@ def add_to_cart():
 
 
 @app.route("/cart/update", methods=["POST"])
-@login_required
 def update_cart():
     ph = "?"
     cart_id = request.form.get("cart_id")
     quantity = int(request.form.get("quantity", 1) or 1)
     if quantity < 1:
         quantity = 1
-    execute("UPDATE cart SET quantity=? WHERE id=? AND user_id=?",
-            (quantity, cart_id, session["user_id"]))
+    if "user_id" in session:
+        execute("UPDATE cart SET quantity=? WHERE id=? AND user_id=?",
+                (quantity, cart_id, session["user_id"]))
+    else:
+        guest = session.get("guest_cart", [])
+        for it in guest:
+            if "g" + str(it["product_id"]) == str(cart_id):
+                it["quantity"] = quantity
+                break
+        session["guest_cart"] = guest
     flash("Cart updated.", "info")
     return redirect(url_for("cart"))
 
 
-@app.route("/cart/remove/<int:cart_id>")
-@login_required
+@app.route("/cart/remove/<cart_id>")
 def remove_from_cart(cart_id):
-    execute("DELETE FROM cart WHERE id=? AND user_id=?",
-            (cart_id, session["user_id"]))
+    if "user_id" in session:
+        execute("DELETE FROM cart WHERE id=? AND user_id=?",
+                (cart_id, session["user_id"]))
+    else:
+        # Guest cart ids are prefixed with "g" (e.g. "g25")
+        pid = cart_id[1:] if str(cart_id).startswith("g") else cart_id
+        try:
+            pid = int(pid)
+        except (ValueError, TypeError):
+            pid = None
+        guest = session.get("guest_cart", [])
+        if pid is not None:
+            guest = [it for it in guest if it["product_id"] != pid]
+        session["guest_cart"] = guest
     flash("Product removed from cart.", "info")
     return redirect(url_for("cart"))
 
@@ -695,15 +804,18 @@ def wishlist_count_api():
 # Checkout & Orders
 # ---------------------------------------------------------------------------
 @app.route("/checkout", methods=["GET", "POST"])
-@login_required
 def checkout():
     ph = "?"
-    summary = cart_summary(session["user_id"])
+    if "user_id" in session:
+        summary = cart_summary(session["user_id"])
+        user = query("SELECT * FROM users WHERE id = %s" % ph, (session["user_id"],), one=True)
+    else:
+        summary = guest_cart_summary()
+        user = None
+
     if not summary["items"]:
         flash("Your cart is empty. Add products before checkout.", "warning")
         return redirect(url_for("cart"))
-
-    user = query("SELECT * FROM users WHERE id = %s" % ph, (session["user_id"],), one=True)
 
     if request.method == "POST":
         customer_name = request.form.get("customer_name", "").strip()
@@ -734,7 +846,7 @@ def checkout():
         execute(
             "INSERT INTO orders (order_number, user_id, customer_name, phone, email, address, city, postal_code, payment_method, subtotal, delivery_charge, discount, total) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (order_number, session["user_id"], customer_name, phone, email, address, city, postal_code,
+            (order_number, session.get("user_id"), customer_name, phone, email, address, city, postal_code,
              payment_method, summary["subtotal"], summary["delivery"], summary["discount"], summary["total"]),
         )
         order = query("SELECT * FROM orders WHERE order_number = %s" % ph, (order_number,), one=True)
@@ -750,7 +862,10 @@ def checkout():
             execute("UPDATE products SET stock = stock - ? WHERE id = ?",
                     (item["quantity"], item["id"]))
 
-        execute("DELETE FROM cart WHERE user_id = %s" % ph, (session["user_id"],))
+        if "user_id" in session:
+            execute("DELETE FROM cart WHERE user_id = %s" % ph, (session["user_id"],))
+        else:
+            session.pop("guest_cart", None)
 
         flash(f"Order placed successfully! Your Order ID is {order_number}", "success")
         return redirect(url_for("order_confirmation", order_number=order_number))
@@ -759,11 +874,15 @@ def checkout():
 
 
 @app.route("/order-confirmation/<order_number>")
-@login_required
 def order_confirmation(order_number):
     ph = "?"
-    order = query("SELECT * FROM orders WHERE order_number=? AND user_id=?",
-                  (order_number, session["user_id"]), one=True)
+    if "user_id" in session:
+        order = query("SELECT * FROM orders WHERE order_number=? AND user_id=?",
+                      (order_number, session["user_id"]), one=True)
+    else:
+        # Guests can view their confirmation by order number alone
+        order = query("SELECT * FROM orders WHERE order_number=?",
+                      (order_number,), one=True)
     if not order:
         abort(404)
     items = query("SELECT * FROM order_items WHERE order_id=%s" % ph, (order["id"],))

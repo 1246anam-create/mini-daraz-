@@ -4,6 +4,9 @@
 <section class="py-4">
     <div class="container">
         <h2 class="mb-4">My Cart</h2>
+        {% if guest %}
+        <div class="alert alert-info">You are browsing as a guest. <a href="{{ url_for('login', next=url_for('checkout')) }}">Login</a> or <a href="{{ url_for('signup', next=url_for('checkout')) }}">Sign up</a> to save your cart and track orders.</div>
+        {% endif %}
         {% if items %}
         <div class="row">
             <div class="col-lg-8">

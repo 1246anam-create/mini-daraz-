@@ -4,6 +4,9 @@
 <section class="py-4">
     <div class="container">
         <h2 class="mb-4">Checkout</h2>
+        {% if not user %}
+        <div class="alert alert-info">You can checkout as a guest. <a href="{{ url_for('login', next=url_for('checkout')) }}">Login</a> or <a href="{{ url_for('signup', next=url_for('checkout')) }}">Sign up</a> to track this order later.</div>
+        {% endif %}
         {% if not items %}
         <div class="alert alert-warning">Your cart is empty. <a href="{{ url_for('products') }}">Shop now</a></div>
         {% else %}
