@@ -987,6 +987,11 @@ def messages():
     ph = "?"
     uid = session.get("user_id")
     user = query("SELECT * FROM users WHERE id=%s" % ph, (uid,), one=True)
+    if not user:
+        # Defensive: session points to a missing/deleted user -> send them to login
+        session.clear()
+        flash("Your session expired. Please login again.", "warning")
+        return redirect(url_for("login"))
 
     if request.method == "POST":
         message = request.form.get("message", "").strip()

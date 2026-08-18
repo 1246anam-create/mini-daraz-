@@ -201,6 +201,9 @@ CREATE TABLE IF NOT EXISTS contact_messages (
     phone       VARCHAR(30),
     subject     VARCHAR(200),
     message     TEXT NOT NULL,
+    user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    reply       TEXT,
+    replied_at  TIMESTAMP,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
